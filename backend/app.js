@@ -1,7 +1,6 @@
 // Main Express application setup
 const express = require('express');
 const cors = require('cors');
-require('dotenv').config();
 
 const app = express();
 
@@ -15,10 +14,15 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
 });
 
-// API routes will be added here
-// app.use('/api/v1/auth', require('./src/routes/auth'));
+// API Routes
+app.use('/api/v1/auth', require('./src/routes/auth'));
 // app.use('/api/v1/admin', require('./src/routes/admin'));
-// etc.
+// app.use('/api/v1/school', require('./src/routes/schoolHead'));
+// app.use('/api/v1/teacher', require('./src/routes/teacher'));
+// app.use('/api/v1/class-head', require('./src/routes/classHead'));
+// app.use('/api/v1/student', require('./src/routes/student'));
+// app.use('/api/v1/parent', require('./src/routes/parent'));
+// app.use('/api/v1/store-house', require('./src/routes/storeHouse'));
 
 // Error handling middleware (will be implemented later)
 app.use((err, req, res, next) => {
@@ -44,5 +48,7 @@ app.use((req, res) => {
 });
 
 module.exports = app;
+
+
 
 
