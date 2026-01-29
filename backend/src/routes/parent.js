@@ -31,3 +31,4 @@ router.get('/children/:student_id/rank', parentController.getChildRank);
 module.exports = router;
 
 
+

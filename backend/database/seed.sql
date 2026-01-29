@@ -357,3 +357,4 @@ INSERT INTO promotion_criteria (name, passing_average, passing_per_subject, max_
 
 
 
+

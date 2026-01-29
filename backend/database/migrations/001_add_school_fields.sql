@@ -17,3 +17,4 @@ UPDATE schools SET code = 'BDCS', status = 'active' WHERE id = 2;
 
 
 
+
