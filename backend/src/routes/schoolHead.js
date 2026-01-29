@@ -60,3 +60,4 @@ router.get('/teachers', schoolHeadController.listTeachers);
 
 module.exports = router;
 
+

@@ -27,3 +27,4 @@ router.post('/logout', verifyToken, authController.logout);
 
 module.exports = router;
 
+

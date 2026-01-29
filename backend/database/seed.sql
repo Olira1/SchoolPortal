@@ -355,3 +355,4 @@ INSERT INTO promotion_criteria (name, passing_average, passing_per_subject, max_
 -- Store House:  mulugeta@aass.edu.et
 -- =====================================================
 
+
