@@ -1,0 +1,62 @@
+// School Head Routes
+const express = require('express');
+const router = express.Router();
+const schoolHeadController = require('../controllers/schoolHeadController');
+const { verifyToken, checkRole } = require('../middleware/auth');
+
+// All routes require authentication and school_head role
+router.use(verifyToken);
+router.use(checkRole('school_head'));
+
+// ==========================================
+// GRADES
+// ==========================================
+router.get('/grades', schoolHeadController.listGrades);
+router.get('/grades/:grade_id', schoolHeadController.getGrade);
+router.post('/grades', schoolHeadController.createGrade);
+router.put('/grades/:grade_id', schoolHeadController.updateGrade);
+router.delete('/grades/:grade_id', schoolHeadController.deleteGrade);
+
+// ==========================================
+// CLASSES
+// ==========================================
+router.get('/classes', schoolHeadController.listClasses);
+router.get('/classes/:class_id', schoolHeadController.getClass);
+router.post('/classes', schoolHeadController.createClass);
+router.put('/classes/:class_id', schoolHeadController.updateClass);
+router.delete('/classes/:class_id', schoolHeadController.deleteClass);
+
+// Class Head Assignment
+router.post('/classes/:class_id/class-head', schoolHeadController.assignClassHead);
+router.delete('/classes/:class_id/class-head', schoolHeadController.removeClassHead);
+
+// ==========================================
+// SUBJECTS
+// ==========================================
+router.get('/subjects', schoolHeadController.listSubjects);
+router.post('/subjects', schoolHeadController.createSubject);
+router.put('/subjects/:subject_id', schoolHeadController.updateSubject);
+router.delete('/subjects/:subject_id', schoolHeadController.deleteSubject);
+
+// ==========================================
+// ASSESSMENT TYPES
+// ==========================================
+router.get('/assessment-types', schoolHeadController.listAssessmentTypes);
+router.post('/assessment-types', schoolHeadController.createAssessmentType);
+router.put('/assessment-types/:type_id', schoolHeadController.updateAssessmentType);
+router.delete('/assessment-types/:type_id', schoolHeadController.deleteAssessmentType);
+
+// ==========================================
+// TEACHING ASSIGNMENTS
+// ==========================================
+router.get('/teaching-assignments', schoolHeadController.listTeachingAssignments);
+router.post('/teaching-assignments', schoolHeadController.createTeachingAssignment);
+router.delete('/teaching-assignments/:assignment_id', schoolHeadController.deleteTeachingAssignment);
+
+// ==========================================
+// TEACHERS
+// ==========================================
+router.get('/teachers', schoolHeadController.listTeachers);
+
+module.exports = router;
+
