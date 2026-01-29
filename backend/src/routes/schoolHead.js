@@ -18,7 +18,13 @@ router.put('/grades/:grade_id', schoolHeadController.updateGrade);
 router.delete('/grades/:grade_id', schoolHeadController.deleteGrade);
 
 // ==========================================
-// CLASSES
+// CLASSES (nested under grades - API contract)
+// ==========================================
+router.get('/grades/:grade_id/classes', schoolHeadController.listClassesByGrade);
+router.post('/grades/:grade_id/classes', schoolHeadController.createClassUnderGrade);
+
+// ==========================================
+// CLASSES (direct access)
 // ==========================================
 router.get('/classes', schoolHeadController.listClasses);
 router.get('/classes/:class_id', schoolHeadController.getClass);

@@ -904,41 +904,54 @@ const deletePromotionCriteria = async (req, res) => {
 /**
  * GET /api/v1/admin/statistics
  * Get platform-wide statistics
+ * Returns data in API contract format
  */
 const getStatistics = async (req, res) => {
   try {
+    // Total schools
     const [schoolCount] = await pool.query('SELECT COUNT(*) as total FROM schools');
     const [activeSchools] = await pool.query("SELECT COUNT(*) as total FROM schools WHERE status = 'active'");
-    const [userCount] = await pool.query('SELECT COUNT(*) as total FROM users');
+    
+    // Total students
     const [studentCount] = await pool.query('SELECT COUNT(*) as total FROM students');
+    
+    // Total teachers (including class_head role as they also teach)
     const [teacherCount] = await pool.query("SELECT COUNT(*) as total FROM users WHERE role IN ('teacher', 'class_head')");
+    
+    // Total classes
+    const [classCount] = await pool.query('SELECT COUNT(*) as total FROM classes');
 
-    // Users by role
-    const [usersByRole] = await pool.query(
-      `SELECT role, COUNT(*) as count FROM users GROUP BY role`
+    // Students by grade level
+    const [studentsByGrade] = await pool.query(
+      `SELECT g.level as grade_level, COUNT(s.id) as count 
+       FROM students s
+       JOIN classes c ON s.class_id = c.id
+       JOIN grades g ON c.grade_id = g.id
+       GROUP BY g.level
+       ORDER BY g.level`
     );
+
+    // Format students by grade
+    const studentsByGradeObj = {};
+    studentsByGrade.forEach(row => {
+      studentsByGradeObj[row.grade_level] = row.count;
+    });
 
     return res.status(200).json({
       success: true,
       data: {
-        schools: {
-          total: schoolCount[0].total,
+        total_schools: schoolCount[0].total,
+        active_schools: activeSchools[0].total,
+        inactive_schools: schoolCount[0].total - activeSchools[0].total,
+        total_students: studentCount[0].total,
+        total_teachers: teacherCount[0].total,
+        total_classes: classCount[0].total,
+        schools_by_status: {
           active: activeSchools[0].total,
           inactive: schoolCount[0].total - activeSchools[0].total
         },
-        users: {
-          total: userCount[0].total,
-          by_role: usersByRole.reduce((acc, r) => {
-            acc[r.role] = r.count;
-            return acc;
-          }, {})
-        },
-        students: {
-          total: studentCount[0].total
-        },
-        teachers: {
-          total: teacherCount[0].total
-        }
+        students_by_grade: studentsByGradeObj,
+        last_updated: new Date().toISOString()
       },
       error: null
     });

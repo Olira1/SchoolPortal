@@ -60,14 +60,9 @@ export const navigationConfig = {
       icon: LayoutDashboard,
     },
     {
-      name: 'Grades',
+      name: 'Grades & Classes',
       path: '/school/grades',
       icon: GraduationCap,
-    },
-    {
-      name: 'Classes',
-      path: '/school/classes',
-      icon: School,
     },
     {
       name: 'Subjects',
@@ -75,7 +70,7 @@ export const navigationConfig = {
       icon: BookOpen,
     },
     {
-      name: 'Assessment Types',
+      name: 'Assessments',
       path: '/school/assessment-types',
       icon: ClipboardList,
     },

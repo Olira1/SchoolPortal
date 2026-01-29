@@ -247,6 +247,145 @@ const deleteGrade = async (req, res) => {
 // ==========================================
 
 /**
+ * GET /api/v1/school/grades/:grade_id/classes
+ * List classes for a specific grade (API contract route)
+ */
+const listClassesByGrade = async (req, res) => {
+  try {
+    const { grade_id } = req.params;
+    const schoolId = req.user.school_id;
+
+    // Verify grade belongs to school
+    const [grade] = await pool.query(
+      'SELECT * FROM grades WHERE id = ? AND school_id = ?',
+      [grade_id, schoolId]
+    );
+
+    if (grade.length === 0) {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        error: { code: 'NOT_FOUND', message: 'Grade not found.' }
+      });
+    }
+
+    const [classes] = await pool.query(
+      `SELECT c.*, g.name as grade_name, g.level as grade_level,
+              u.name as class_head_name, u.phone as class_head_phone,
+              (SELECT COUNT(*) FROM students s WHERE s.class_id = c.id) as student_count
+       FROM classes c
+       JOIN grades g ON c.grade_id = g.id
+       LEFT JOIN users u ON c.class_head_id = u.id
+       WHERE c.grade_id = ?
+       ORDER BY c.name`,
+      [grade_id]
+    );
+
+    const items = classes.map(c => ({
+      id: c.id,
+      name: c.name,
+      grade_id: c.grade_id,
+      grade_name: c.grade_name,
+      class_head: c.class_head_id ? {
+        id: c.class_head_id,
+        name: c.class_head_name,
+        phone: c.class_head_phone
+      } : null,
+      student_count: c.student_count
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: { items },
+      error: null
+    });
+  } catch (error) {
+    console.error('List classes by grade error:', error);
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: { code: 'INTERNAL_ERROR', message: 'Failed to fetch classes.' }
+    });
+  }
+};
+
+/**
+ * POST /api/v1/school/grades/:grade_id/classes
+ * Create a new class under a specific grade (API contract route)
+ */
+const createClassUnderGrade = async (req, res) => {
+  try {
+    const { grade_id } = req.params;
+    const schoolId = req.user.school_id;
+    const { name, capacity, class_head_id } = req.body;
+
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        data: null,
+        error: { code: 'VALIDATION_ERROR', message: 'Class name is required.' }
+      });
+    }
+
+    // Verify grade belongs to school
+    const [grade] = await pool.query(
+      'SELECT * FROM grades WHERE id = ? AND school_id = ?',
+      [grade_id, schoolId]
+    );
+
+    if (grade.length === 0) {
+      return res.status(400).json({
+        success: false,
+        data: null,
+        error: { code: 'VALIDATION_ERROR', message: 'Invalid grade.' }
+      });
+    }
+
+    // Get current academic year
+    const academicYear = await getCurrentAcademicYear();
+    if (!academicYear) {
+      return res.status(400).json({
+        success: false,
+        data: null,
+        error: { code: 'VALIDATION_ERROR', message: 'No current academic year set.' }
+      });
+    }
+
+    // Check if class name exists for this grade
+    const [existing] = await pool.query(
+      'SELECT id FROM classes WHERE grade_id = ? AND name = ?',
+      [grade_id, name]
+    );
+
+    if (existing.length > 0) {
+      return res.status(409).json({
+        success: false,
+        data: null,
+        error: { code: 'CONFLICT', message: 'Class name already exists for this grade.' }
+      });
+    }
+
+    const [result] = await pool.query(
+      'INSERT INTO classes (grade_id, name, class_head_id, academic_year_id) VALUES (?, ?, ?, ?)',
+      [grade_id, name, class_head_id || null, academicYear.id]
+    );
+
+    return res.status(201).json({
+      success: true,
+      data: { id: result.insertId, name, grade_id: parseInt(grade_id) },
+      error: null
+    });
+  } catch (error) {
+    console.error('Create class under grade error:', error);
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: { code: 'INTERNAL_ERROR', message: 'Failed to create class.' }
+    });
+  }
+};
+
+/**
  * GET /api/v1/school/classes
  * List all classes for the school
  */
@@ -1287,7 +1426,9 @@ const removeClassHead = async (req, res) => {
 module.exports = {
   // Grades
   listGrades, getGrade, createGrade, updateGrade, deleteGrade,
-  // Classes
+  // Classes (nested under grades - API contract)
+  listClassesByGrade, createClassUnderGrade,
+  // Classes (direct access)
   listClasses, getClass, createClass, updateClass, deleteClass,
   // Subjects
   listSubjects, createSubject, updateSubject, deleteSubject,

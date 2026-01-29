@@ -8,6 +8,24 @@ import { DashboardLayout } from './components/layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 
+// Admin Pages
+import { 
+  AdminDashboard, 
+  SchoolsPage, 
+  PromotionCriteriaPage, 
+  StatisticsPage 
+} from './pages/admin';
+
+// School Head Pages
+import {
+  SchoolHeadDashboard,
+  GradesClassesPage,
+  SubjectsPage,
+  AssessmentTypesPage,
+  TeachersPage,
+  TeacherAssignmentsPage
+} from './pages/schoolHead';
+
 function App() {
   return (
     <BrowserRouter>
@@ -25,11 +43,11 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<Dashboard />} />
-            <Route path="schools" element={<Dashboard />} />
-            <Route path="schools/:id" element={<Dashboard />} />
-            <Route path="promotion-criteria" element={<Dashboard />} />
-            <Route path="statistics" element={<Dashboard />} />
+            <Route index element={<AdminDashboard />} />
+            <Route path="schools" element={<SchoolsPage />} />
+            <Route path="schools/:id" element={<SchoolsPage />} />
+            <Route path="promotion-criteria" element={<PromotionCriteriaPage />} />
+            <Route path="statistics" element={<StatisticsPage />} />
             <Route path="profile" element={<Dashboard />} />
           </Route>
 
@@ -42,13 +60,13 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<Dashboard />} />
-            <Route path="grades" element={<Dashboard />} />
-            <Route path="classes" element={<Dashboard />} />
-            <Route path="subjects" element={<Dashboard />} />
-            <Route path="assessment-types" element={<Dashboard />} />
-            <Route path="teachers" element={<Dashboard />} />
-            <Route path="assignments" element={<Dashboard />} />
+            <Route index element={<SchoolHeadDashboard />} />
+            <Route path="grades" element={<GradesClassesPage />} />
+            <Route path="classes" element={<GradesClassesPage />} />
+            <Route path="subjects" element={<SubjectsPage />} />
+            <Route path="assessment-types" element={<AssessmentTypesPage />} />
+            <Route path="teachers" element={<TeachersPage />} />
+            <Route path="assignments" element={<TeacherAssignmentsPage />} />
             <Route path="profile" element={<Dashboard />} />
           </Route>
 
