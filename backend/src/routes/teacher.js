@@ -53,3 +53,4 @@ router.get('/classes/:class_id/subjects/:subject_id/averages', teacherController
 module.exports = router;
 
 
+

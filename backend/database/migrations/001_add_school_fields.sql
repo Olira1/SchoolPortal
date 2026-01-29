@@ -16,3 +16,4 @@ UPDATE schools SET code = 'AASS', status = 'active' WHERE id = 1;
 UPDATE schools SET code = 'BDCS', status = 'active' WHERE id = 2;
 
 
+

@@ -20,9 +20,9 @@ app.use('/api/v1/admin', require('./src/routes/admin'));
 app.use('/api/v1/school', require('./src/routes/schoolHead'));
 app.use('/api/v1/teacher', require('./src/routes/teacher'));
 app.use('/api/v1/class-head', require('./src/routes/classHead'));
-// app.use('/api/v1/student', require('./src/routes/student'));
-// app.use('/api/v1/parent', require('./src/routes/parent'));
-// app.use('/api/v1/store-house', require('./src/routes/storeHouse'));
+app.use('/api/v1/student', require('./src/routes/student'));
+app.use('/api/v1/parent', require('./src/routes/parent'));
+app.use('/api/v1/store-house', require('./src/routes/storeHouse'));
 
 // Error handling middleware (will be implemented later)
 app.use((err, req, res, next) => {
