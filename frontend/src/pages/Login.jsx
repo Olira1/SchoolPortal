@@ -4,7 +4,7 @@
 // ADDED: Error message display, loading state
 
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { GraduationCap, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
 
@@ -18,9 +18,19 @@ const Login = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  // URL params (for redirect messages like school_suspended)
+  const [searchParams] = useSearchParams();
+
   // UI state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  // Check for school suspended redirect message
+  useEffect(() => {
+    if (searchParams.get('error') === 'school_suspended') {
+      setError('Your school has been suspended. Contact the platform administrator.');
+    }
+  }, [searchParams]);
 
   // Redirect if already authenticated
   useEffect(() => {

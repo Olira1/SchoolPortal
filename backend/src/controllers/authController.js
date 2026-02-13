@@ -75,11 +75,23 @@ const login = async (req, res) => {
     let schoolName = null;
     if (user.school_id) {
       const [schools] = await pool.query(
-        'SELECT name FROM schools WHERE id = ?',
+        'SELECT name, status FROM schools WHERE id = ?',
         [user.school_id]
       );
       if (schools.length > 0) {
         schoolName = schools[0].name;
+
+        // Block login if school is inactive (admin is exempt)
+        if (schools[0].status === 'inactive' && user.role !== 'admin') {
+          return res.status(403).json({
+            success: false,
+            data: null,
+            error: {
+              code: 'SCHOOL_INACTIVE',
+              message: 'Your school has been suspended. Contact the platform administrator.'
+            }
+          });
+        }
       }
     }
 

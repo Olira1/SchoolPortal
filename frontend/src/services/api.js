@@ -38,7 +38,7 @@ api.interceptors.response.use(
   (error) => {
     // Handle specific error cases
     if (error.response) {
-      const { status } = error.response;
+      const { status, data } = error.response;
       
       // 401 Unauthorized - Token expired or invalid
       if (status === 401) {
@@ -51,6 +51,20 @@ api.interceptors.response.use(
         // Redirect to login if not already there
         if (window.location.pathname !== '/login') {
           window.location.href = '/login';
+        }
+      }
+
+      // 403 School Inactive - School has been suspended by admin
+      if (status === 403 && data?.error?.code === 'SCHOOL_INACTIVE') {
+        // Clear stored tokens
+        localStorage.removeItem('token');
+        sessionStorage.removeItem('token');
+        localStorage.removeItem('user');
+        sessionStorage.removeItem('user');
+        
+        // Redirect to login with suspended message
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login?error=school_suspended';
         }
       }
     }

@@ -62,6 +62,24 @@ const verifyToken = async (req, res, next) => {
       });
     }
 
+    // Check if user's school is active (admin is exempt - they manage all schools)
+    if (user.school_id && user.role !== 'admin') {
+      const [schools] = await pool.query(
+        'SELECT status FROM schools WHERE id = ?',
+        [user.school_id]
+      );
+      if (schools.length > 0 && schools[0].status === 'inactive') {
+        return res.status(403).json({
+          success: false,
+          data: null,
+          error: {
+            code: 'SCHOOL_INACTIVE',
+            message: 'Your school has been suspended. Contact the platform administrator.'
+          }
+        });
+      }
+    }
+
     // Attach user to request object
     req.user = {
       id: user.id,

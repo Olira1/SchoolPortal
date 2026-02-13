@@ -26,6 +26,18 @@ import {
   TeacherAssignmentsPage
 } from './pages/schoolHead';
 
+// Class Head Pages
+import {
+  ClassHeadDashboard,
+  StudentsPage as ClassHeadStudentsPage,
+  GradeEntryPage,
+  SubmissionsPage,
+  CompilePublishPage,
+  ClassSnapshotPage,
+  StudentReportsPage,
+  SendRosterPage
+} from './pages/classHead';
+
 function App() {
   return (
     <BrowserRouter>
@@ -96,14 +108,14 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<Dashboard />} />
-            <Route path="class" element={<Dashboard />} />
-            <Route path="students" element={<Dashboard />} />
-            <Route path="grades" element={<Dashboard />} />
-            <Route path="submissions" element={<Dashboard />} />
-            <Route path="compile" element={<Dashboard />} />
-            <Route path="snapshot" element={<Dashboard />} />
-            <Route path="roster" element={<Dashboard />} />
+            <Route index element={<ClassHeadDashboard />} />
+            <Route path="students" element={<ClassHeadStudentsPage />} />
+            <Route path="grades" element={<GradeEntryPage />} />
+            <Route path="submissions" element={<SubmissionsPage />} />
+            <Route path="compile" element={<CompilePublishPage />} />
+            <Route path="snapshot" element={<ClassSnapshotPage />} />
+            <Route path="reports" element={<StudentReportsPage />} />
+            <Route path="roster" element={<SendRosterPage />} />
             <Route path="profile" element={<Dashboard />} />
           </Route>
 

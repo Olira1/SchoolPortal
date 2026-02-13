@@ -44,10 +44,20 @@ export const AuthProvider = ({ children }) => {
           } else {
             // Token invalid, clear storage
             clearAuth();
+            if (window.location.pathname !== '/login') {
+              window.location.href = '/login';
+            }
           }
         } catch (error) {
-          // Token invalid or expired
+          // Token invalid, expired, or school suspended
           clearAuth();
+          const isSchoolSuspended = error.response?.status === 403 &&
+            error.response?.data?.error?.code === 'SCHOOL_INACTIVE';
+          if (window.location.pathname !== '/login') {
+            window.location.href = isSchoolSuspended
+              ? '/login?error=school_suspended'
+              : '/login';
+          }
         }
       }
       

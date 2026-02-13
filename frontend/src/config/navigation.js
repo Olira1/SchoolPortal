@@ -115,17 +115,12 @@ export const navigationConfig = {
     },
   ],
 
-  // Class Head Navigation (same as teacher + class head features)
+  // Class Head Navigation (class head features + teacher-inherited grade entry)
   class_head: [
     {
       name: 'Dashboard',
       path: '/class-head',
       icon: LayoutDashboard,
-    },
-    {
-      name: 'My Class',
-      path: '/class-head/class',
-      icon: School,
     },
     {
       name: 'Students',
@@ -151,6 +146,11 @@ export const navigationConfig = {
       name: 'Class Snapshot',
       path: '/class-head/snapshot',
       icon: BarChart3,
+    },
+    {
+      name: 'Student Reports',
+      path: '/class-head/reports',
+      icon: FileSpreadsheet,
     },
     {
       name: 'Send Roster',

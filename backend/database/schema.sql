@@ -21,6 +21,7 @@ CREATE TABLE schools (
     address VARCHAR(500),
     phone VARCHAR(20),
     email VARCHAR(255),
+    status ENUM('active', 'inactive') DEFAULT 'active',
     school_head_id INT NULL,                    -- Will be updated after users table
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP

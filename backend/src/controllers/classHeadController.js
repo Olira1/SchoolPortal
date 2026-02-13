@@ -779,6 +779,75 @@ const publishSemesterResults = async (req, res) => {
   }
 };
 
+/**
+ * POST /api/v1/class-head/publish/year
+ * Publish year results (combines both semesters)
+ */
+const publishYearResults = async (req, res) => {
+  try {
+    const { academic_year_id } = req.body;
+    const classInfo = await getClassHeadClass(req.user.id);
+    
+    if (!classInfo) {
+      return res.status(403).json({
+        success: false,
+        data: null,
+        error: { code: 'FORBIDDEN', message: 'You are not assigned as class head.' }
+      });
+    }
+
+    const [yearInfo] = await pool.query('SELECT name FROM academic_years WHERE id = ?', [academic_year_id]);
+
+    // Get semesters for this academic year
+    const [semesters] = await pool.query(
+      'SELECT id, name FROM semesters WHERE academic_year_id = ? ORDER BY `order`',
+      [academic_year_id]
+    );
+
+    const semesterNames = semesters.map(s => s.name);
+
+    // Mark all semester results as published for this class
+    let totalPublished = 0;
+    for (const semester of semesters) {
+      const [updateResult] = await pool.query(
+        `UPDATE student_semester_results ssr
+         JOIN students s ON ssr.student_id = s.id
+         SET ssr.is_published = TRUE, ssr.published_at = NOW()
+         WHERE s.class_id = ? AND ssr.semester_id = ? AND ssr.is_published = FALSE`,
+        [classInfo.id, semester.id]
+      );
+      totalPublished += updateResult.affectedRows;
+    }
+
+    // Count total students
+    const [studentCount] = await pool.query(
+      'SELECT COUNT(*) as count FROM students WHERE class_id = ?',
+      [classInfo.id]
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        class_id: classInfo.id,
+        class_name: classInfo.name,
+        academic_year: yearInfo[0]?.name,
+        semesters_included: semesterNames,
+        students_published: studentCount[0].count,
+        published_at: new Date().toISOString(),
+        sent_to_store_house: true
+      },
+      error: null
+    });
+  } catch (error) {
+    console.error('Publish year results error:', error);
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: { code: 'INTERNAL_ERROR', message: 'Failed to publish year results.' }
+    });
+  }
+};
+
 // ==========================================
 // SEND ROSTER TO STORE HOUSE
 // ==========================================
@@ -1052,6 +1121,7 @@ module.exports = {
   compileGrades,
   getClassSnapshot,
   publishSemesterResults,
+  publishYearResults,
   sendRosterToStoreHouse,
   getStudentReport
 };
