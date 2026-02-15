@@ -113,6 +113,11 @@ export const navigationConfig = {
       path: '/teacher/submissions',
       icon: Send,
     },
+    {
+      name: 'Averages',
+      path: '/teacher/averages',
+      icon: BarChart3,
+    },
   ],
 
   // Class Head Navigation (class head features + teacher-inherited grade entry)

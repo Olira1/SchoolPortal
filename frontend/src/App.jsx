@@ -26,6 +26,16 @@ import {
   TeacherAssignmentsPage
 } from './pages/schoolHead';
 
+// Teacher Pages
+import {
+  TeacherDashboard,
+  MyClassesPage,
+  TeacherGradeEntryPage,
+  AssessmentWeightsPage,
+  TeacherSubmissionsPage,
+  AveragesPage
+} from './pages/teacher';
+
 // Class Head Pages
 import {
   ClassHeadDashboard,
@@ -91,11 +101,12 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<Dashboard />} />
-            <Route path="classes" element={<Dashboard />} />
-            <Route path="grades" element={<Dashboard />} />
-            <Route path="weights" element={<Dashboard />} />
-            <Route path="submissions" element={<Dashboard />} />
+            <Route index element={<TeacherDashboard />} />
+            <Route path="classes" element={<MyClassesPage />} />
+            <Route path="grades" element={<TeacherGradeEntryPage />} />
+            <Route path="weights" element={<AssessmentWeightsPage />} />
+            <Route path="submissions" element={<TeacherSubmissionsPage />} />
+            <Route path="averages" element={<AveragesPage />} />
             <Route path="profile" element={<Dashboard />} />
           </Route>
 
