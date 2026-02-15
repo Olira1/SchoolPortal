@@ -224,7 +224,8 @@ const getStudentRankings = async (req, res) => {
         [student.student_id, semester_id, classInfo.id]
       );
 
-      const total = scores.reduce((sum, s) => sum + (s.weighted_score || 0), 0);
+      // parseFloat needed: MySQL DECIMAL values come back as strings
+      const total = scores.reduce((sum, s) => sum + (parseFloat(s.weighted_score) || 0), 0);
       const subjectsCount = scores.length;
       const average = subjectsCount > 0 ? total / subjectsCount : 0;
 
@@ -564,7 +565,8 @@ const compileGrades = async (req, res) => {
         [student.student_id, semester_id, classInfo.id]
       );
 
-      const total = scores.reduce((sum, s) => sum + (s.subject_score || 0), 0);
+      // parseFloat needed: MySQL DECIMAL values come back as strings
+      const total = scores.reduce((sum, s) => sum + (parseFloat(s.subject_score) || 0), 0);
       const subjectsCount = scores.length;
       const average = subjectsCount > 0 ? total / subjectsCount : 0;
 
@@ -944,10 +946,10 @@ const sendRosterToStoreHouse = async (req, res) => {
     };
 
     await pool.query(
-      `INSERT INTO rosters (class_id, semester_id, academic_year_id, roster_data, created_by)
-       VALUES (?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE roster_data = VALUES(roster_data), updated_at = NOW()`,
-      [classInfo.id, semester_id, academic_year_id, JSON.stringify(rosterData), req.user.id]
+      `INSERT INTO rosters (class_id, semester_id, roster_data, submitted_by)
+       VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE roster_data = VALUES(roster_data), submitted_at = NOW()`,
+      [classInfo.id, semester_id, JSON.stringify(rosterData), req.user.id]
     );
 
     return res.status(200).json({
