@@ -7,13 +7,21 @@ import {
   RefreshCw, AlertCircle, GraduationCap, Trophy, BookOpen,
   ChevronRight, Users, ArrowRight
 } from 'lucide-react';
-import api from '../../services/api';
-import { listChildren, getChildRank } from '../../services/parentService';
+import {
+  listChildren, listChildSubjectScores, getChildRank
+} from '../../services/parentService';
+
+// Available semesters (matching seed data)
+const semesters = [
+  { id: 5, name: 'First Semester (2017 E.C)', academic_year_id: 3 },
+  { id: 6, name: 'Second Semester (2017 E.C)', academic_year_id: 3 },
+];
 
 const ParentDashboard = () => {
   const navigate = useNavigate();
   const [children, setChildren] = useState([]);
   const [selectedChild, setSelectedChild] = useState(null);
+  const [selectedSemester, setSelectedSemester] = useState(semesters[0]);
   const [subjectScores, setSubjectScores] = useState([]);
   const [rankData, setRankData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -24,12 +32,12 @@ const ParentDashboard = () => {
     fetchChildren();
   }, []);
 
-  // Fetch data when child is selected
+  // Fetch data when child or semester changes
   useEffect(() => {
     if (selectedChild) {
-      fetchChildData(selectedChild);
+      fetchChildData();
     }
-  }, [selectedChild]);
+  }, [selectedChild, selectedSemester]);
 
   const fetchChildren = async () => {
     setLoading(true);
@@ -38,7 +46,6 @@ const ParentDashboard = () => {
       const res = await listChildren();
       if (res.success && res.data.items?.length > 0) {
         setChildren(res.data.items);
-        // Auto-select first child
         setSelectedChild(res.data.items[0]);
       }
     } catch (err) {
@@ -49,32 +56,28 @@ const ParentDashboard = () => {
     }
   };
 
-  const fetchChildData = async (child) => {
+  const fetchChildData = async () => {
     try {
-      // Fetch current semester's subject scores
-      const [semRes] = await Promise.all([
-        api.get('/semesters/current').catch(() => null),
-      ]);
-
-      const currentSemester = semRes?.data?.data;
-      if (!currentSemester) return;
-
       const [scoresRes, rankRes] = await Promise.all([
-        api.get(`/parent/children/${child.student_id}/subjects/scores`, {
-          params: { semester_id: currentSemester.id }
+        listChildSubjectScores(selectedChild.student_id, {
+          semester_id: selectedSemester.id
         }).catch(() => null),
-        getChildRank(child.student_id, {
-          semester_id: currentSemester.id,
-          academic_year_id: currentSemester.academic_year_id,
+        getChildRank(selectedChild.student_id, {
+          semester_id: selectedSemester.id,
+          academic_year_id: selectedSemester.academic_year_id,
           type: 'semester'
         }).catch(() => null),
       ]);
 
-      if (scoresRes?.data?.success) {
-        setSubjectScores(scoresRes.data.data.items || []);
+      if (scoresRes?.success) {
+        setSubjectScores(scoresRes.data.items || []);
+      } else {
+        setSubjectScores([]);
       }
       if (rankRes?.success) {
         setRankData(rankRes.data);
+      } else {
+        setRankData(null);
       }
     } catch (err) {
       console.error('Error fetching child data:', err);
@@ -119,27 +122,43 @@ const ParentDashboard = () => {
         </div>
       )}
 
-      {/* Child Selector (if multiple children) */}
-      {children.length > 1 && (
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <p className="text-sm font-medium text-gray-700 mb-2">Select Child</p>
-          <div className="flex gap-3 flex-wrap">
-            {children.map(child => (
-              <button
-                key={child.student_id}
-                onClick={() => setSelectedChild(child)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all ${
-                  selectedChild?.student_id === child.student_id
-                    ? 'bg-indigo-600 text-white border-indigo-600'
-                    : 'bg-white text-gray-700 border-gray-300 hover:border-indigo-400'
-                }`}
-              >
-                {child.name} — {child.class_name}
-              </button>
-            ))}
+      {/* Child Selector + Semester Selector */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col sm:flex-row gap-4">
+        {/* Child selector */}
+        {children.length > 1 && (
+          <div className="flex-1">
+            <p className="text-xs font-medium text-gray-500 mb-1">Select Child</p>
+            <div className="flex gap-2 flex-wrap">
+              {children.map(child => (
+                <button
+                  key={child.student_id}
+                  onClick={() => setSelectedChild(child)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
+                    selectedChild?.student_id === child.student_id
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'bg-white text-gray-700 border-gray-300 hover:border-indigo-400'
+                  }`}
+                >
+                  {child.name}
+                </button>
+              ))}
+            </div>
           </div>
+        )}
+        {/* Semester selector */}
+        <div>
+          <p className="text-xs font-medium text-gray-500 mb-1">Semester</p>
+          <select
+            value={selectedSemester.id}
+            onChange={(e) => setSelectedSemester(semesters.find(s => s.id === parseInt(e.target.value)))}
+            className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          >
+            {semesters.map(s => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
         </div>
-      )}
+      </div>
 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
@@ -148,7 +167,7 @@ const ParentDashboard = () => {
             <GraduationCap className="w-5 h-5 text-blue-500" />
             <span className="text-xs text-gray-500 uppercase font-semibold">Semester Average</span>
           </div>
-          <p className="text-3xl font-bold text-blue-600">{avgScore.toFixed(1)}%</p>
+          <p className="text-3xl font-bold text-blue-600">{avgScore.toFixed(1)}</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-2">
@@ -158,7 +177,7 @@ const ParentDashboard = () => {
           <p className="text-3xl font-bold text-amber-600">
             {rankData?.rank?.position || '—'}
             <span className="text-sm font-normal text-gray-500">
-              {rankData?.rank?.total_students ? ` out of ${rankData.rank.total_students}` : ''}
+              {rankData?.rank?.total_students ? ` / ${rankData.rank.total_students}` : ''}
             </span>
           </p>
         </div>
@@ -175,12 +194,12 @@ const ParentDashboard = () => {
       {/* Subject Performance Cards */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold text-gray-900">Recent Subject Performance</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Subject Performance</h2>
           <button
             onClick={() => navigate('/parent/subjects')}
             className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"
           >
-            View Details <ArrowRight className="w-4 h-4" />
+            View Assessment Details <ArrowRight className="w-4 h-4" />
           </button>
         </div>
         {subjectScores.length > 0 ? (

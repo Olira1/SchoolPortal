@@ -3,46 +3,45 @@
 
 import { useState, useEffect } from 'react';
 import {
-  RefreshCw, AlertCircle, FileText, BookOpen, Trophy
+  RefreshCw, AlertCircle, Trophy
 } from 'lucide-react';
-import api from '../../services/api';
-import { listChildren, getChildSemesterReport, getChildRank } from '../../services/parentService';
+import {
+  listChildren, getChildSemesterReport, getChildRank
+} from '../../services/parentService';
+
+// Available semesters (matching seed data)
+const semesters = [
+  { id: 5, name: 'First Semester (2017 E.C)', academic_year_id: 3 },
+  { id: 6, name: 'Second Semester (2017 E.C)', academic_year_id: 3 },
+];
 
 const SemesterReportPage = () => {
   const [children, setChildren] = useState([]);
   const [selectedChild, setSelectedChild] = useState(null);
+  const [selectedSemester, setSelectedSemester] = useState(semesters[0]);
   const [report, setReport] = useState(null);
   const [rankData, setRankData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [reportLoading, setReportLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [currentSemester, setCurrentSemester] = useState(null);
 
   useEffect(() => {
-    fetchInitData();
+    fetchChildren();
   }, []);
 
   useEffect(() => {
-    if (selectedChild && currentSemester) {
+    if (selectedChild) {
       fetchReport();
     }
-  }, [selectedChild, currentSemester]);
+  }, [selectedChild, selectedSemester]);
 
-  const fetchInitData = async () => {
+  const fetchChildren = async () => {
     setLoading(true);
     try {
-      const [childRes, semRes] = await Promise.all([
-        listChildren(),
-        api.get('/semesters/current').catch(() => null),
-      ]);
-
-      const items = childRes?.data?.items || [];
+      const res = await listChildren();
+      const items = res?.data?.items || [];
       setChildren(items);
       if (items.length > 0) setSelectedChild(items[0]);
-
-      if (semRes?.data?.data) {
-        setCurrentSemester(semRes.data.data);
-      }
     } catch (err) {
       setError('Failed to load data.');
       console.error(err);
@@ -59,12 +58,12 @@ const SemesterReportPage = () => {
     try {
       const [reportRes, rankRes] = await Promise.all([
         getChildSemesterReport(selectedChild.student_id, {
-          semester_id: currentSemester.id,
-          academic_year_id: currentSemester.academic_year_id
+          semester_id: selectedSemester.id,
+          academic_year_id: selectedSemester.academic_year_id
         }).catch(err => err.response?.data || null),
         getChildRank(selectedChild.student_id, {
-          semester_id: currentSemester.id,
-          academic_year_id: currentSemester.academic_year_id,
+          semester_id: selectedSemester.id,
+          academic_year_id: selectedSemester.academic_year_id,
           type: 'semester'
         }).catch(() => null),
       ]);
@@ -72,14 +71,14 @@ const SemesterReportPage = () => {
       if (reportRes?.success) {
         setReport(reportRes.data);
       } else {
-        setError(reportRes?.error?.message || 'Report not yet published.');
+        setError(reportRes?.error?.message || 'Report not yet published. The class head needs to publish semester results first.');
       }
 
       if (rankRes?.success) {
         setRankData(rankRes.data);
       }
     } catch (err) {
-      setError('Failed to load report.');
+      setError('Report not yet published.');
       console.error(err);
     } finally {
       setReportLoading(false);
@@ -104,27 +103,41 @@ const SemesterReportPage = () => {
         </p>
       </div>
 
-      {/* Child Selector */}
-      {children.length > 1 && (
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <p className="text-sm font-medium text-gray-700 mb-2">Select Child</p>
-          <div className="flex gap-3 flex-wrap">
-            {children.map(child => (
-              <button
-                key={child.student_id}
-                onClick={() => setSelectedChild(child)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all ${
-                  selectedChild?.student_id === child.student_id
-                    ? 'bg-indigo-600 text-white border-indigo-600'
-                    : 'bg-white text-gray-700 border-gray-300 hover:border-indigo-400'
-                }`}
-              >
-                {child.name} — {child.class_name}
-              </button>
-            ))}
+      {/* Child + Semester Selector */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col sm:flex-row gap-4">
+        {children.length > 1 && (
+          <div className="flex-1">
+            <p className="text-xs font-medium text-gray-500 mb-1">Select Child</p>
+            <div className="flex gap-2 flex-wrap">
+              {children.map(child => (
+                <button
+                  key={child.student_id}
+                  onClick={() => setSelectedChild(child)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
+                    selectedChild?.student_id === child.student_id
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'bg-white text-gray-700 border-gray-300 hover:border-indigo-400'
+                  }`}
+                >
+                  {child.name}
+                </button>
+              ))}
+            </div>
           </div>
+        )}
+        <div>
+          <p className="text-xs font-medium text-gray-500 mb-1">Semester</p>
+          <select
+            value={selectedSemester.id}
+            onChange={(e) => setSelectedSemester(semesters.find(s => s.id === parseInt(e.target.value)))}
+            className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          >
+            {semesters.map(s => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
         </div>
-      )}
+      </div>
 
       {reportLoading ? (
         <div className="flex items-center justify-center h-40">
@@ -137,7 +150,7 @@ const SemesterReportPage = () => {
         </div>
       ) : report ? (
         <>
-          {/* Student Info Card */}
+          {/* Report Card */}
           <div className="bg-white border-2 border-gray-300 rounded-xl p-6">
             <h2 className="text-lg font-bold text-gray-900 text-center mb-4">Student Semester Report</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
