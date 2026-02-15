@@ -1,13 +1,14 @@
 // Student Dashboard - Academic overview with subject performance cards
-// API: GET /student/profile, GET /student/rank, GET /student/subjects/:id/grades
+// Shows overall summary and per-subject scores with link to detailed assessment view
+// API: GET /student/profile, GET /student/rank, GET /student/subjects/scores
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   GraduationCap, Award, TrendingUp, BookOpen, RefreshCw,
-  AlertCircle, BarChart3, ArrowRight
+  AlertCircle, BarChart3, ArrowRight, ClipboardList
 } from 'lucide-react';
-import { getProfile, getRank, getSubjectGrades } from '../../services/studentService';
+import { getProfile, getRank } from '../../services/studentService';
 import api from '../../services/api';
 
 const StudentDashboard = () => {
@@ -30,25 +31,17 @@ const StudentDashboard = () => {
     setLoading(true);
     setError(null);
     try {
-      // Fetch profile and rank in parallel
-      const [profileRes, rankRes] = await Promise.all([
+      // Fetch profile, rank, and subject scores in parallel
+      const [profileRes, rankRes, subjectsRes] = await Promise.all([
         getProfile().catch(() => null),
         getRank({ semester_id: semesterId, academic_year_id: academicYearId, type: 'semester' }).catch(() => null),
+        api.get('/student/subjects/scores', { params: { semester_id: semesterId } }).catch(() => null),
       ]);
 
       if (profileRes?.success) setProfile(profileRes.data);
       if (rankRes?.success) setRankData(rankRes.data);
-
-      // Fetch subject scores (from marks, no published report required)
-      try {
-        const subjectsRes = await api.get('/student/subjects/scores', {
-          params: { semester_id: semesterId }
-        });
-        if (subjectsRes.data?.success) {
-          setSubjectScores(subjectsRes.data.data.items || []);
-        }
-      } catch {
-        setSubjectScores([]);
+      if (subjectsRes?.data?.success) {
+        setSubjectScores(subjectsRes.data.data.items || []);
       }
     } catch (err) {
       setError('Failed to load dashboard data.');
@@ -122,7 +115,13 @@ const StudentDashboard = () => {
         </div>
 
         {/* Quick actions */}
-        <div className="flex gap-3 mt-4">
+        <div className="flex flex-wrap gap-3 mt-4">
+          <button
+            onClick={() => navigate('/student/subjects')}
+            className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"
+          >
+            <ClipboardList className="w-4 h-4" /> View Assessment Marks <ArrowRight className="w-4 h-4" />
+          </button>
           <button
             onClick={() => navigate('/student/semester-report')}
             className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"
@@ -140,14 +139,25 @@ const StudentDashboard = () => {
 
       {/* Subject Performance */}
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Subject Performance</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Subject Performance</h2>
+          {subjectScores.length > 0 && (
+            <button
+              onClick={() => navigate('/student/subjects')}
+              className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"
+            >
+              View All Assessment Details <ArrowRight className="w-4 h-4" />
+            </button>
+          )}
+        </div>
 
         {subjectScores.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {subjectScores.map((subject) => (
               <div
                 key={subject.name}
-                className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md transition-shadow"
+                onClick={() => navigate('/student/subjects')}
+                className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer"
               >
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
@@ -157,7 +167,7 @@ const StudentDashboard = () => {
                 </div>
 
                 <div className="mb-3">
-                  <p className="text-xs text-gray-500">Current Mark</p>
+                  <p className="text-xs text-gray-500">Total Weighted Score</p>
                   <p className={`text-2xl font-bold ${subject.score >= 50 ? 'text-indigo-600' : 'text-red-600'}`}>
                     {subject.score?.toFixed(1) || 0}
                     <span className="text-sm text-gray-400 font-normal">/100</span>
@@ -172,15 +182,12 @@ const StudentDashboard = () => {
                       style={{ width: `${Math.min(subject.score || 0, 100)}%` }}
                     />
                   </div>
-                  <p className="text-xs text-gray-400 text-right mt-1">{(subject.score || 0).toFixed(0)}% Achieved</p>
                 </div>
 
-                <button
-                  onClick={() => navigate('/student/subjects')}
-                  className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"
-                >
-                  View Details <ArrowRight className="w-3 h-3" />
-                </button>
+                <p className="text-xs text-indigo-500 font-medium flex items-center gap-1">
+                  <ClipboardList className="w-3 h-3" />
+                  Click to view assessment breakdown
+                </p>
               </div>
             ))}
           </div>
@@ -188,7 +195,7 @@ const StudentDashboard = () => {
           <div className="bg-white border border-gray-200 rounded-xl p-12 text-center text-gray-400">
             <BookOpen className="w-12 h-12 mx-auto mb-3" />
             <p className="text-lg font-medium text-gray-900">No Subject Data Yet</p>
-            <p className="text-sm mt-1">Subject scores will appear here once grades are published.</p>
+            <p className="text-sm mt-1">Subject scores will appear here once your teachers submit marks.</p>
           </div>
         )}
       </div>
