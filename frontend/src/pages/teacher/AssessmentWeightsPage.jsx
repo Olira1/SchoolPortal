@@ -5,8 +5,9 @@
 import { useState, useEffect } from 'react';
 import {
   Settings, AlertCircle, RefreshCw, CheckCircle2, Info,
-  Save, RotateCcw, Lightbulb
+  Save, RotateCcw, Lightbulb, ArrowRight
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import {
   getAssignedClasses,
   getAssessmentWeights,
@@ -15,6 +16,8 @@ import {
 } from '../../services/teacherService';
 
 const AssessmentWeightsPage = () => {
+  const navigate = useNavigate();
+
   // Selection state
   const [classes, setClasses] = useState([]);
   const [selectedClass, setSelectedClass] = useState('');
@@ -129,15 +132,37 @@ const AssessmentWeightsPage = () => {
     setSuccess(null);
   };
 
-  const loadSuggestions = () => {
-    if (suggestions.length > 0) {
-      setWeights(suggestions.map(s => ({
-        assessment_type_id: s.assessment_type_id,
-        name: s.assessment_type_name || s.name || `Type ${s.assessment_type_id}`,
-        weight_percent: parseFloat(s.weight_percent || s.default_weight_percent) || 0
-      })));
-      setSource('default');
-      setSuccess(null);
+  // Re-fetch the latest suggestions from the API (not cached) so school head edits are reflected
+  const loadSuggestions = async () => {
+    setError(null);
+    setSuccess(null);
+    try {
+      const params = {
+        class_id: selectedClass,
+        subject_id: selectedSubject,
+        semester_id: selectedSemester
+      };
+      const res = await getWeightSuggestions(params);
+      if (res?.success) {
+        const freshSuggestions = res.data?.suggested_weights || [];
+        setSuggestions(freshSuggestions);
+        setWeights(freshSuggestions.map(s => ({
+          assessment_type_id: s.assessment_type_id,
+          name: s.assessment_type_name || s.name || `Type ${s.assessment_type_id}`,
+          weight_percent: parseFloat(s.weight_percent || s.default_weight_percent) || 0
+        })));
+        setSource(res.data?.source || 'default');
+      }
+    } catch (err) {
+      // Fall back to cached suggestions
+      if (suggestions.length > 0) {
+        setWeights(suggestions.map(s => ({
+          assessment_type_id: s.assessment_type_id,
+          name: s.assessment_type_name || s.name || `Type ${s.assessment_type_id}`,
+          weight_percent: parseFloat(s.weight_percent || s.default_weight_percent) || 0
+        })));
+        setSource('default');
+      }
     }
   };
 
@@ -247,9 +272,17 @@ const AssessmentWeightsPage = () => {
         </div>
       )}
       {success && (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3 text-green-700">
-          <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
-          <span className="text-sm">{success}</span>
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center justify-between text-green-700">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+            <span className="text-sm">{success}</span>
+          </div>
+          <button
+            onClick={() => navigate('/teacher/grades')}
+            className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"
+          >
+            Go to Grade Entry <ArrowRight className="w-4 h-4" />
+          </button>
         </div>
       )}
 
@@ -260,14 +293,14 @@ const AssessmentWeightsPage = () => {
         </div>
       ) : selectedClass && selectedSubject && selectedSemester ? (
         <>
-          {/* School Head Suggestion Link */}
-          {suggestions.length > 0 && source !== 'default' && (
+          {/* School Head Suggestion Link - always re-fetch latest from API */}
+          {source === 'teacher_defined' && (
             <button
               onClick={loadSuggestions}
               className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 text-sm font-medium"
             >
               <Lightbulb className="w-4 h-4" />
-              Load School Head Suggested Weights
+              Load Latest School Head Weight Template
             </button>
           )}
 
