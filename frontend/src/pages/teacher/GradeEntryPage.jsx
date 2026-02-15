@@ -97,8 +97,14 @@ const GradeEntryPage = () => {
     }
   };
 
-  // Get all unique assessment types from grade data (parse numbers since MySQL returns decimals as strings)
-  const assessmentTypes = gradeData?.items?.[0]?.grades?.map(g => ({
+  // Get assessment types - prefer the dedicated assessment_types from the API,
+  // fall back to deriving from first student's grades for backward compatibility
+  const assessmentTypes = gradeData?.assessment_types?.map(at => ({
+    id: at.assessment_type_id,
+    name: at.assessment_type_name,
+    max_score: parseFloat(at.max_score) || 0,
+    weight_percent: parseFloat(at.weight_percent) || 0
+  })) || gradeData?.items?.[0]?.grades?.map(g => ({
     id: g.assessment_type_id,
     name: g.assessment_type_name,
     max_score: parseFloat(g.max_score) || 0,
@@ -119,7 +125,8 @@ const GradeEntryPage = () => {
     const key = `${student.student_id}-${assessmentTypeId}`;
     if (editedScores[key] !== undefined) return editedScores[key];
     const grade = student.grades?.find(g => g.assessment_type_id === assessmentTypeId);
-    return grade?.score ?? '';
+    // Return empty string if score is null (no mark entered yet)
+    return grade?.score != null ? grade.score : '';
   };
 
   // Get grade ID for a cell (for updates)
@@ -201,8 +208,25 @@ const GradeEntryPage = () => {
     }
   };
 
+  // Check if any grades have been entered (either saved or edited)
+  const hasAnyGrades = () => {
+    if (!gradeData?.items) return false;
+    // Check if any student has at least one non-null score (saved marks)
+    for (const student of gradeData.items) {
+      for (const grade of (student.grades || [])) {
+        if (grade.score != null) return true;
+      }
+    }
+    // Also check if any edited (unsaved) scores exist
+    return Object.values(editedScores).some(v => v !== '' && v != null);
+  };
+
   // Submit grades for approval
   const handleSubmit = async () => {
+    if (!hasAnyGrades()) {
+      setError('Cannot submit: no grades have been entered yet. Please enter marks first.');
+      return;
+    }
     if (!window.confirm('Submit all grades for Class Head approval? You cannot modify them after submission.')) return;
 
     setSubmitting(true);

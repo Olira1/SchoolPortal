@@ -444,6 +444,38 @@ const listStudentGrades = async (req, res) => {
     const [subjectInfo] = await pool.query('SELECT id, name FROM subjects WHERE id = ?', [subject_id]);
     const [semesterInfo] = await pool.query('SELECT id, name FROM semesters WHERE id = ?', [semester_id]);
 
+    // Get assessment types with weights for this assignment/semester
+    // First try teacher-defined weights, then fall back to school defaults
+    let [assessmentTypes] = await pool.query(
+      `SELECT aw.assessment_type_id, at.name as assessment_type_name,
+              aw.weight_percent, at.default_weight_percent as max_score_default
+       FROM assessment_weights aw
+       JOIN assessment_types at ON aw.assessment_type_id = at.id
+       WHERE aw.teaching_assignment_id = ? AND aw.semester_id = ?
+       ORDER BY at.id`,
+      [assignment.id, semester_id]
+    );
+
+    // If no weights are set for this assignment, fall back to school-wide assessment types
+    if (assessmentTypes.length === 0) {
+      [assessmentTypes] = await pool.query(
+        `SELECT id as assessment_type_id, name as assessment_type_name,
+                default_weight_percent as weight_percent, default_weight_percent as max_score_default
+         FROM assessment_types WHERE school_id = ?
+         ORDER BY id`,
+        [req.user.school_id]
+      );
+    }
+
+    // Determine max_score for each assessment type based on weight
+    // (e.g., weight 10% => max_score 10, weight 20% => max_score 20, weight 40% => max_score 40)
+    const assessmentTypeMap = assessmentTypes.map(at => ({
+      assessment_type_id: at.assessment_type_id,
+      assessment_type_name: at.assessment_type_name,
+      weight_percent: parseFloat(at.weight_percent) || 0,
+      max_score: parseFloat(at.weight_percent) || 10 // max_score equals weight by default
+    }));
+
     // Get students with their grades (join with users for name)
     const [students] = await pool.query(
       `SELECT s.id as student_id, u.name as student_name
@@ -453,6 +485,14 @@ const listStudentGrades = async (req, res) => {
        ORDER BY u.name`,
       [class_id]
     );
+
+    // Check submission status once (same for all students)
+    const [submissions] = await pool.query(
+      `SELECT status FROM grade_submissions 
+       WHERE teaching_assignment_id = ? AND semester_id = ?`,
+      [assignment.id, semester_id]
+    );
+    const submissionStatus = submissions.length > 0 ? submissions[0].status : 'draft';
 
     const items = [];
     for (const student of students) {
@@ -471,21 +511,47 @@ const listStudentGrades = async (req, res) => {
         [student.student_id, assignment.id, semester_id]
       );
 
-      const totalWeightedScore = marks.reduce((sum, m) => sum + (parseFloat(m.weighted_score) || 0), 0);
+      // Build a complete grades array: one entry per assessment type
+      // If a mark exists use it; otherwise create an empty placeholder
+      const gradesMap = {};
+      marks.forEach(m => { gradesMap[m.assessment_type_id] = m; });
 
-      // Check submission status
-      const [submissions] = await pool.query(
-        `SELECT status FROM grade_submissions 
-         WHERE teaching_assignment_id = ? AND semester_id = ?`,
-        [assignment.id, semester_id]
-      );
+      const completeGrades = assessmentTypeMap.map(at => {
+        if (gradesMap[at.assessment_type_id]) {
+          const m = gradesMap[at.assessment_type_id];
+          return {
+            id: m.id,
+            assessment_type_id: m.assessment_type_id,
+            assessment_type_name: m.assessment_type_name,
+            score: m.score,
+            max_score: parseFloat(m.max_score) || at.max_score,
+            weight_percent: parseFloat(m.weight_percent) || at.weight_percent,
+            weighted_score: parseFloat(m.weighted_score) || 0,
+            entered_at: m.entered_at
+          };
+        } else {
+          // No mark yet - return placeholder with assessment type info
+          return {
+            id: null,
+            assessment_type_id: at.assessment_type_id,
+            assessment_type_name: at.assessment_type_name,
+            score: null,
+            max_score: at.max_score,
+            weight_percent: at.weight_percent,
+            weighted_score: 0,
+            entered_at: null
+          };
+        }
+      });
+
+      const totalWeightedScore = completeGrades.reduce((sum, g) => sum + (parseFloat(g.weighted_score) || 0), 0);
 
       items.push({
         student_id: student.student_id,
         student_name: student.student_name,
-        grades: marks,
+        grades: completeGrades,
         total_weighted_score: Math.round(totalWeightedScore * 100) / 100,
-        submission_status: submissions.length > 0 ? submissions[0].status : 'draft'
+        submission_status: submissionStatus
       });
     }
 
@@ -495,6 +561,7 @@ const listStudentGrades = async (req, res) => {
         class: classInfo[0],
         subject: subjectInfo[0],
         semester: semesterInfo[0],
+        assessment_types: assessmentTypeMap,
         items: items
       },
       error: null
@@ -901,15 +968,24 @@ const submitGrades = async (req, res) => {
       [assignment.id, semester_id]
     );
 
+    // Prevent submission if no grades have been entered
+    if (gradedCount[0].graded === 0) {
+      return res.status(400).json({
+        success: false,
+        data: null,
+        error: { code: 'NO_GRADES', message: 'Cannot submit: no grades have been entered yet. Please enter marks first.' }
+      });
+    }
+
     // Create or update submission
     if (existing.length > 0) {
       await pool.query(
-        `UPDATE grade_submissions SET status = 'submitted', submitted_at = NOW(), remarks = ? WHERE id = ?`,
+        `UPDATE grade_submissions SET status = 'submitted', submitted_at = NOW(), comments = ? WHERE id = ?`,
         [remarks || null, existing[0].id]
       );
     } else {
       await pool.query(
-        `INSERT INTO grade_submissions (teaching_assignment_id, semester_id, status, remarks, submitted_at)
+        `INSERT INTO grade_submissions (teaching_assignment_id, semester_id, status, comments, submitted_at)
          VALUES (?, ?, 'submitted', ?, NOW())`,
         [assignment.id, semester_id, remarks || null]
       );
@@ -936,7 +1012,7 @@ const submitGrades = async (req, res) => {
       error: null
     });
   } catch (error) {
-    console.error('Submit grades error:', error);
+    console.error('Submit grades error:', error.message, error.stack);
     return res.status(500).json({
       success: false,
       data: null,

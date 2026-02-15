@@ -19,8 +19,8 @@ import { getClassSnapshot } from '../../services/classHeadService';
 const ClassSnapshotPage = () => {
   // State
   const [snapshot, setSnapshot] = useState(null);
-  const [selectedSemesterId, setSelectedSemesterId] = useState('1');
-  const [selectedAcademicYearId, setSelectedAcademicYearId] = useState('1');
+  const [selectedSemesterId, setSelectedSemesterId] = useState('5');
+  const [selectedAcademicYearId, setSelectedAcademicYearId] = useState('3');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -128,8 +128,8 @@ const ClassSnapshotPage = () => {
                 onChange={(e) => setSelectedSemesterId(e.target.value)}
                 className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-10 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
               >
-                <option value="1">First Semester</option>
-                <option value="2">Second Semester</option>
+                <option value="5">First Semester (2017 E.C)</option>
+                <option value="6">Second Semester (2017 E.C)</option>
               </select>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             </div>
@@ -142,8 +142,7 @@ const ClassSnapshotPage = () => {
                 onChange={(e) => setSelectedAcademicYearId(e.target.value)}
                 className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-10 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
               >
-                <option value="1">2023/2024</option>
-                <option value="2">2024/2025</option>
+                <option value="3">2024/2025 (2017 E.C)</option>
               </select>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             </div>

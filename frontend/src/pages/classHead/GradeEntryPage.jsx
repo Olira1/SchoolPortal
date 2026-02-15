@@ -27,7 +27,7 @@ const GradeEntryPage = () => {
   const [assignedClasses, setAssignedClasses] = useState([]);
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
-  const [selectedSemesterId, setSelectedSemesterId] = useState('1'); // Default semester
+  const [selectedSemesterId, setSelectedSemesterId] = useState('5'); // Default semester
 
   // State: grade data
   const [gradeData, setGradeData] = useState(null);
@@ -358,8 +358,8 @@ const GradeEntryPage = () => {
                 onChange={(e) => setSelectedSemesterId(e.target.value)}
                 className="w-full appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2.5 pr-10 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
               >
-                <option value="1">First Semester</option>
-                <option value="2">Second Semester</option>
+                <option value="5">First Semester (2017 E.C)</option>
+                <option value="6">Second Semester (2017 E.C)</option>
               </select>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             </div>

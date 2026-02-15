@@ -31,7 +31,7 @@ const StatusBadge = ({ status }) => {
     submitted: { color: 'bg-blue-100 text-blue-700', icon: Clock, label: 'Submitted' },
     approved: { color: 'bg-green-100 text-green-700', icon: CheckCircle2, label: 'Approved' },
     pending: { color: 'bg-yellow-100 text-yellow-700', icon: Clock, label: 'Pending' },
-    revision_requested: { color: 'bg-red-100 text-red-700', icon: XCircle, label: 'Revision Requested' },
+    rejected: { color: 'bg-red-100 text-red-700', icon: XCircle, label: 'Revision Requested' },
     draft: { color: 'bg-gray-100 text-gray-700', icon: Clock, label: 'Draft' },
   };
   const { color, icon: StatusIcon, label } = config[status] || config.pending;
@@ -47,7 +47,7 @@ const StatusBadge = ({ status }) => {
 const SubmissionsPage = () => {
   // State
   const [checklist, setChecklist] = useState(null);
-  const [selectedSemesterId, setSelectedSemesterId] = useState('1');
+  const [selectedSemesterId, setSelectedSemesterId] = useState('5');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
@@ -189,8 +189,8 @@ const SubmissionsPage = () => {
               onChange={(e) => setSelectedSemesterId(e.target.value)}
               className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-10 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
             >
-              <option value="1">First Semester</option>
-              <option value="2">Second Semester</option>
+              <option value="5">First Semester (2017 E.C)</option>
+              <option value="6">Second Semester (2017 E.C)</option>
             </select>
             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
           </div>

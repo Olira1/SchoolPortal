@@ -144,6 +144,7 @@ const getSubmissionChecklist = async (req, res) => {
         subject_name: a.subject_name,
         teacher: { id: a.teacher_id, name: a.teacher_name },
         status: status,
+        submission_id: submissions.length > 0 ? submissions[0].id : null,
         submitted_at: submissions.length > 0 ? submissions[0].submitted_at : null,
         students_graded: gradedCount[0].count,
         total_students: a.total_students
@@ -336,8 +337,8 @@ const reviewSubmission = async (req, res) => {
       [submission.teaching_assignment_id, classInfo.id]
     );
 
-    // Calculate statistics
-    const scores = students.map(s => s.subject_score || 0).filter(s => s > 0);
+    // Calculate statistics (parse to float since MySQL returns DECIMALs as strings)
+    const scores = students.map(s => parseFloat(s.subject_score) || 0).filter(s => s > 0);
     const average = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
     const highest = scores.length > 0 ? Math.max(...scores) : 0;
     const lowest = scores.length > 0 ? Math.min(...scores) : 0;
@@ -355,7 +356,7 @@ const reviewSubmission = async (req, res) => {
         students: students.map(s => ({
           student_id: s.student_id,
           student_name: s.student_name,
-          subject_score: Math.round((s.subject_score || 0) * 100) / 100
+          subject_score: Math.round((parseFloat(s.subject_score) || 0) * 100) / 100
         })),
         class_statistics: {
           average: Math.round(average * 100) / 100,
@@ -422,7 +423,7 @@ const approveSubmission = async (req, res) => {
     // Update submission status
     await pool.query(
       `UPDATE grade_submissions 
-       SET status = 'approved', reviewed_at = NOW(), reviewed_by = ?, review_remarks = ?
+       SET status = 'approved', reviewed_at = NOW(), reviewed_by = ?, comments = ?
        WHERE id = ?`,
       [req.user.id, remarks || null, submission_id]
     );
@@ -492,7 +493,7 @@ const rejectSubmission = async (req, res) => {
     // Update submission status
     await pool.query(
       `UPDATE grade_submissions 
-       SET status = 'revision_requested', reviewed_at = NOW(), reviewed_by = ?, review_remarks = ?
+       SET status = 'rejected', reviewed_at = NOW(), reviewed_by = ?, comments = ?
        WHERE id = ?`,
       [req.user.id, reason, submission_id]
     );
@@ -501,7 +502,7 @@ const rejectSubmission = async (req, res) => {
       success: true,
       data: {
         submission_id: parseInt(submission_id),
-        status: 'revision_requested',
+        status: 'rejected',
         rejected_at: new Date().toISOString(),
         reason: reason
       },
@@ -684,7 +685,7 @@ const getClassSnapshot = async (req, res) => {
           [student.student_id, semester_id, subject.id]
         );
 
-        const score = Math.round((scores[0]?.score || 0) * 100) / 100;
+        const score = Math.round((parseFloat(scores[0]?.score) || 0) * 100) / 100;
         subjectScores[subject.name] = score;
         total += score;
       }
@@ -907,7 +908,7 @@ const sendRosterToStoreHouse = async (req, res) => {
           [student.student_id, semester_id, subject.id]
         );
 
-        const score = Math.round((scores[0]?.score || 0) * 100) / 100;
+        const score = Math.round((parseFloat(scores[0]?.score) || 0) * 100) / 100;
         subjectScores[subject.name] = score;
         total += score;
       }
