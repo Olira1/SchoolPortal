@@ -106,7 +106,9 @@ const getRoster = async (req, res) => {
     }
 
     const roster = rosters[0];
-    const rosterData = JSON.parse(roster.roster_data || '{}');
+    const rosterData = typeof roster.roster_data === 'string'
+      ? JSON.parse(roster.roster_data || '{}')
+      : (roster.roster_data || {});
     const students = rosterData.students || [];
 
     // Calculate statistics
@@ -463,8 +465,11 @@ const listTranscripts = async (req, res) => {
     );
 
     // Extract transcript_number and purpose from JSON
+    // MySQL JSON columns may return parsed objects or strings depending on driver
     const items = transcripts.map(t => {
-      const data = JSON.parse(t.transcript_data || '{}');
+      const data = typeof t.transcript_data === 'string'
+        ? JSON.parse(t.transcript_data || '{}')
+        : (t.transcript_data || {});
       return {
         id: t.id,
         transcript_number: data.transcript_number,
@@ -521,7 +526,9 @@ const getTranscript = async (req, res) => {
     }
 
     const transcript = transcripts[0];
-    const transcriptData = JSON.parse(transcript.transcript_data || '{}');
+    const transcriptData = typeof transcript.transcript_data === 'string'
+      ? JSON.parse(transcript.transcript_data || '{}')
+      : (transcript.transcript_data || {});
 
     return res.status(200).json({
       success: true,

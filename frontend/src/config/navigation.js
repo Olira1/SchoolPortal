@@ -220,19 +220,14 @@ export const navigationConfig = {
       icon: LayoutDashboard,
     },
     {
-      name: 'Rosters',
+      name: 'Class Rosters',
       path: '/store-house/rosters',
       icon: Archive,
     },
     {
-      name: 'Student Search',
+      name: 'Student Records',
       path: '/store-house/students',
       icon: Users,
-    },
-    {
-      name: 'Cumulative Records',
-      path: '/store-house/records',
-      icon: FileSpreadsheet,
     },
     {
       name: 'Transcripts',

@@ -57,6 +57,14 @@ import {
   RankPage
 } from './pages/student';
 
+// Store House Pages
+import {
+  StoreHouseDashboard,
+  RostersPage as StoreHouseRostersPage,
+  StudentRecordsPage as StoreHouseStudentRecordsPage,
+  TranscriptsPage as StoreHouseTranscriptsPage
+} from './pages/storeHouse';
+
 function App() {
   return (
     <BrowserRouter>
@@ -180,12 +188,10 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<Dashboard />} />
-            <Route path="rosters" element={<Dashboard />} />
-            <Route path="students" element={<Dashboard />} />
-            <Route path="records" element={<Dashboard />} />
-            <Route path="transcripts" element={<Dashboard />} />
-            <Route path="profile" element={<Dashboard />} />
+            <Route index element={<StoreHouseDashboard />} />
+            <Route path="rosters" element={<StoreHouseRostersPage />} />
+            <Route path="students" element={<StoreHouseStudentRecordsPage />} />
+            <Route path="transcripts" element={<StoreHouseTranscriptsPage />} />
           </Route>
 
           {/* Legacy dashboard route - redirect based on role */}
