@@ -65,6 +65,14 @@ import {
   TranscriptsPage as StoreHouseTranscriptsPage
 } from './pages/storeHouse';
 
+// Parent Pages
+import {
+  ParentDashboard,
+  SubjectDetailPage as ParentSubjectDetailPage,
+  SemesterReportPage as ParentSemesterReportPage,
+  YearReportPage as ParentYearReportPage
+} from './pages/parent';
+
 function App() {
   return (
     <BrowserRouter>
@@ -172,11 +180,10 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<Dashboard />} />
-            <Route path="children" element={<Dashboard />} />
-            <Route path="children/:id" element={<Dashboard />} />
-            <Route path="reports" element={<Dashboard />} />
-            <Route path="profile" element={<Dashboard />} />
+            <Route index element={<ParentDashboard />} />
+            <Route path="subjects" element={<ParentSubjectDetailPage />} />
+            <Route path="semester-report" element={<ParentSemesterReportPage />} />
+            <Route path="year-report" element={<ParentYearReportPage />} />
           </Route>
 
           {/* Store House Routes */}

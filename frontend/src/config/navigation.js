@@ -196,19 +196,24 @@ export const navigationConfig = {
   // Parent Navigation
   parent: [
     {
-      name: 'Dashboard',
+      name: 'Child Overview',
       path: '/parent',
       icon: LayoutDashboard,
     },
     {
-      name: 'My Children',
-      path: '/parent/children',
-      icon: Users,
+      name: 'Subject Marks',
+      path: '/parent/subjects',
+      icon: BookOpen,
     },
     {
-      name: 'Reports',
-      path: '/parent/reports',
+      name: 'Semester Report',
+      path: '/parent/semester-report',
       icon: FileText,
+    },
+    {
+      name: 'Year Report',
+      path: '/parent/year-report',
+      icon: FileSpreadsheet,
     },
   ],
 

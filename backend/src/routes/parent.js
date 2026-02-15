@@ -17,10 +17,12 @@ router.get('/children', parentController.listChildren);
 // CHILD REPORTS
 // ==========================================
 router.get('/children/:student_id/reports/semester', parentController.getChildSemesterReport);
+router.get('/children/:student_id/reports/year', parentController.getChildYearReport);
 
 // ==========================================
-// CHILD SUBJECTS
+// CHILD SUBJECTS (scores must come before :subject_id)
 // ==========================================
+router.get('/children/:student_id/subjects/scores', parentController.listChildSubjectScores);
 router.get('/children/:student_id/subjects/:subject_id/grades', parentController.getChildSubjectGrades);
 
 // ==========================================
@@ -29,6 +31,3 @@ router.get('/children/:student_id/subjects/:subject_id/grades', parentController
 router.get('/children/:student_id/rank', parentController.getChildRank);
 
 module.exports = router;
-
-
-
