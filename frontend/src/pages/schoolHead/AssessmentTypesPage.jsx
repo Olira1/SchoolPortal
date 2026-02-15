@@ -261,18 +261,23 @@ const WeightTemplateModal = ({ isOpen, mode, template, assessmentTypes, onClose,
 
   useEffect(() => {
     if (template && mode === 'edit') {
+      // Ensure weight values are numbers (MySQL DECIMAL may return strings)
+      const parsedWeights = (template.weights || []).map(w => ({
+        ...w,
+        weight_percent: parseFloat(w.weight_percent) || 0
+      }));
       setFormData({
         name: template.name || '',
         description: template.description || '',
-        weights: template.weights || [],
+        weights: parsedWeights,
         is_default: template.is_default || false
       });
     } else {
-      // Initialize weights with assessment types
+      // Initialize weights with assessment types - parseFloat to avoid string concatenation
       const defaultWeights = assessmentTypes.map(at => ({
         assessment_type_id: at.id,
         assessment_type_name: at.name,
-        weight_percent: at.default_weight_percent || 0,
+        weight_percent: parseFloat(at.default_weight_percent) || 0,
         max_score: 100
       }));
       setFormData({ name: '', description: '', weights: defaultWeights, is_default: false });
@@ -282,11 +287,11 @@ const WeightTemplateModal = ({ isOpen, mode, template, assessmentTypes, onClose,
 
   const updateWeight = (index, value) => {
     const newWeights = [...formData.weights];
-    newWeights[index] = { ...newWeights[index], weight_percent: parseInt(value) || 0 };
+    newWeights[index] = { ...newWeights[index], weight_percent: parseFloat(value) || 0 };
     setFormData({ ...formData, weights: newWeights });
   };
 
-  const totalWeight = formData.weights.reduce((sum, w) => sum + w.weight_percent, 0);
+  const totalWeight = formData.weights.reduce((sum, w) => sum + (parseFloat(w.weight_percent) || 0), 0);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -456,22 +461,29 @@ const AssessmentTypesPage = () => {
   const [deleteModal, setDeleteModal] = useState({ open: false, type: null, item: null });
   const [actionLoading, setActionLoading] = useState(false);
 
-  // Fetch data
+  // Fetch data - each call handled individually so one failure doesn't block the other
   const fetchData = async () => {
     try {
       setLoading(true);
+      setError(null);
+
       const [typesRes, templatesRes] = await Promise.all([
-        getAssessmentTypes(),
-        getWeightTemplates()
+        getAssessmentTypes().catch(err => {
+          console.error('Error fetching assessment types:', err);
+          return null;
+        }),
+        getWeightTemplates().catch(err => {
+          console.error('Error fetching weight templates:', err);
+          return null;
+        })
       ]);
       
-      if (typesRes.success) {
+      if (typesRes?.success) {
         setAssessmentTypes(typesRes.data.items || []);
       }
-      if (templatesRes.success) {
+      if (templatesRes?.success) {
         setWeightTemplates(templatesRes.data.items || []);
       }
-      setError(null);
     } catch (err) {
       console.error('Error fetching data:', err);
       const errorData = err.response?.data?.error;

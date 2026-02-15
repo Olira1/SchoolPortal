@@ -105,14 +105,15 @@ const AssessmentWeightsPage = () => {
         })));
         setSource(weightsRes.data.source || 'teacher_defined');
       } else if (suggestionsRes?.success) {
-        // Use suggestions as default weights
+        // Use suggestions as default weights (may come from weight_template or assessment_type defaults)
         const suggestedWeights = suggestionsRes.data?.suggested_weights || suggestionsRes.data?.suggestions || [];
         setWeights(suggestedWeights.map(s => ({
           assessment_type_id: s.assessment_type_id,
           name: s.assessment_type_name || s.name || `Type ${s.assessment_type_id}`,
           weight_percent: parseFloat(s.weight_percent || s.default_weight_percent) || 0
         })));
-        setSource('default');
+        // Indicate the source: weight_template or default
+        setSource(suggestionsRes.data?.source || 'default');
       }
     } catch (err) {
       setError(err.response?.data?.error?.message || 'Failed to load weights.');
@@ -274,7 +275,11 @@ const AssessmentWeightsPage = () => {
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <Info className="w-4 h-4" />
               <span>
-                Source: {source === 'teacher_defined' ? 'Custom (set by you)' : 'Default (School Head suggestions)'}
+                Source: {source === 'teacher_defined'
+                  ? 'Custom (set by you)'
+                  : source === 'weight_template'
+                    ? 'Weight Template (from School Head)'
+                    : 'Default (School Head suggestions)'}
               </span>
             </div>
           )}

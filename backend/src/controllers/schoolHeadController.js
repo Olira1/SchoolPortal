@@ -1333,6 +1333,269 @@ const deleteAssessmentType = async (req, res) => {
 };
 
 // ==========================================
+// WEIGHT TEMPLATES
+// ==========================================
+
+/**
+ * GET /api/v1/school/weight-templates
+ * List all weight templates for the school
+ */
+const listWeightTemplates = async (req, res) => {
+  try {
+    const schoolId = req.user.school_id;
+
+    const [templates] = await pool.query(
+      'SELECT * FROM weight_templates WHERE school_id = ? ORDER BY is_default DESC, name',
+      [schoolId]
+    );
+
+    // Parse JSON weights for each template
+    const items = templates.map(t => ({
+      id: t.id,
+      name: t.name,
+      description: t.description,
+      weights: typeof t.weights === 'string' ? JSON.parse(t.weights) : (t.weights || []),
+      is_default: !!t.is_default,
+      created_at: t.created_at,
+      updated_at: t.updated_at
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: { items },
+      error: null
+    });
+  } catch (error) {
+    console.error('List weight templates error:', error);
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: { code: 'INTERNAL_ERROR', message: 'Failed to fetch weight templates.' }
+    });
+  }
+};
+
+/**
+ * GET /api/v1/school/weight-templates/:template_id
+ * Get single weight template details
+ */
+const getWeightTemplate = async (req, res) => {
+  try {
+    const { template_id } = req.params;
+    const schoolId = req.user.school_id;
+
+    const [templates] = await pool.query(
+      'SELECT * FROM weight_templates WHERE id = ? AND school_id = ?',
+      [template_id, schoolId]
+    );
+
+    if (templates.length === 0) {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        error: { code: 'NOT_FOUND', message: 'Weight template not found.' }
+      });
+    }
+
+    const t = templates[0];
+    return res.status(200).json({
+      success: true,
+      data: {
+        id: t.id,
+        name: t.name,
+        description: t.description,
+        weights: typeof t.weights === 'string' ? JSON.parse(t.weights) : (t.weights || []),
+        is_default: !!t.is_default,
+        created_at: t.created_at,
+        updated_at: t.updated_at
+      },
+      error: null
+    });
+  } catch (error) {
+    console.error('Get weight template error:', error);
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: { code: 'INTERNAL_ERROR', message: 'Failed to fetch weight template.' }
+    });
+  }
+};
+
+/**
+ * POST /api/v1/school/weight-templates
+ * Create a new weight template
+ */
+const createWeightTemplate = async (req, res) => {
+  try {
+    const schoolId = req.user.school_id;
+    const { name, description, weights, is_default } = req.body;
+
+    // Validate required fields
+    if (!name || !weights || !Array.isArray(weights)) {
+      return res.status(400).json({
+        success: false,
+        data: null,
+        error: { code: 'VALIDATION_ERROR', message: 'Name and weights array are required.' }
+      });
+    }
+
+    // Validate weights sum to 100%
+    const totalWeight = weights.reduce((sum, w) => sum + (w.weight_percent || 0), 0);
+    if (totalWeight !== 100) {
+      return res.status(400).json({
+        success: false,
+        data: null,
+        error: { code: 'VALIDATION_ERROR', message: `Weights must sum to 100%. Current total: ${totalWeight}%` }
+      });
+    }
+
+    // If setting as default, unset any existing default
+    if (is_default) {
+      await pool.query(
+        'UPDATE weight_templates SET is_default = FALSE WHERE school_id = ?',
+        [schoolId]
+      );
+    }
+
+    const [result] = await pool.query(
+      'INSERT INTO weight_templates (school_id, name, description, weights, is_default) VALUES (?, ?, ?, ?, ?)',
+      [schoolId, name, description || null, JSON.stringify(weights), is_default ? 1 : 0]
+    );
+
+    return res.status(201).json({
+      success: true,
+      data: {
+        id: result.insertId,
+        name,
+        description,
+        weights,
+        is_default: !!is_default,
+        created_at: new Date()
+      },
+      error: null
+    });
+  } catch (error) {
+    console.error('Create weight template error:', error);
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: { code: 'INTERNAL_ERROR', message: 'Failed to create weight template.' }
+    });
+  }
+};
+
+/**
+ * PUT /api/v1/school/weight-templates/:template_id
+ * Update a weight template
+ */
+const updateWeightTemplate = async (req, res) => {
+  try {
+    const { template_id } = req.params;
+    const schoolId = req.user.school_id;
+    const { name, description, weights, is_default } = req.body;
+
+    // Check template exists
+    const [existing] = await pool.query(
+      'SELECT * FROM weight_templates WHERE id = ? AND school_id = ?',
+      [template_id, schoolId]
+    );
+
+    if (existing.length === 0) {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        error: { code: 'NOT_FOUND', message: 'Weight template not found.' }
+      });
+    }
+
+    // Validate weights sum if provided
+    if (weights) {
+      const totalWeight = weights.reduce((sum, w) => sum + (w.weight_percent || 0), 0);
+      if (totalWeight !== 100) {
+        return res.status(400).json({
+          success: false,
+          data: null,
+          error: { code: 'VALIDATION_ERROR', message: `Weights must sum to 100%. Current total: ${totalWeight}%` }
+        });
+      }
+    }
+
+    // If setting as default, unset others
+    if (is_default) {
+      await pool.query(
+        'UPDATE weight_templates SET is_default = FALSE WHERE school_id = ? AND id != ?',
+        [schoolId, template_id]
+      );
+    }
+
+    const updates = [];
+    const params = [];
+
+    if (name !== undefined) { updates.push('name = ?'); params.push(name); }
+    if (description !== undefined) { updates.push('description = ?'); params.push(description); }
+    if (weights !== undefined) { updates.push('weights = ?'); params.push(JSON.stringify(weights)); }
+    if (is_default !== undefined) { updates.push('is_default = ?'); params.push(is_default ? 1 : 0); }
+
+    if (updates.length > 0) {
+      params.push(template_id);
+      await pool.query(`UPDATE weight_templates SET ${updates.join(', ')} WHERE id = ?`, params);
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: { id: parseInt(template_id), updated: true },
+      error: null
+    });
+  } catch (error) {
+    console.error('Update weight template error:', error);
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: { code: 'INTERNAL_ERROR', message: 'Failed to update weight template.' }
+    });
+  }
+};
+
+/**
+ * DELETE /api/v1/school/weight-templates/:template_id
+ * Delete a weight template
+ */
+const deleteWeightTemplate = async (req, res) => {
+  try {
+    const { template_id } = req.params;
+    const schoolId = req.user.school_id;
+
+    const [existing] = await pool.query(
+      'SELECT * FROM weight_templates WHERE id = ? AND school_id = ?',
+      [template_id, schoolId]
+    );
+
+    if (existing.length === 0) {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        error: { code: 'NOT_FOUND', message: 'Weight template not found.' }
+      });
+    }
+
+    await pool.query('DELETE FROM weight_templates WHERE id = ?', [template_id]);
+
+    return res.status(200).json({
+      success: true,
+      data: { message: 'Weight template deleted successfully.' },
+      error: null
+    });
+  } catch (error) {
+    console.error('Delete weight template error:', error);
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: { code: 'INTERNAL_ERROR', message: 'Failed to delete weight template.' }
+    });
+  }
+};
+
+// ==========================================
 // TEACHING ASSIGNMENTS
 // ==========================================
 
@@ -1697,6 +1960,8 @@ module.exports = {
   listSubjectsByGrade, addSubjectToGrade, updateSubjectInGrade, removeSubjectFromGrade,
   // Assessment Types
   listAssessmentTypes, createAssessmentType, updateAssessmentType, deleteAssessmentType,
+  // Weight Templates
+  listWeightTemplates, getWeightTemplate, createWeightTemplate, updateWeightTemplate, deleteWeightTemplate,
   // Teaching Assignments
   listTeachingAssignments, createTeachingAssignment, deleteTeachingAssignment,
   // Teachers

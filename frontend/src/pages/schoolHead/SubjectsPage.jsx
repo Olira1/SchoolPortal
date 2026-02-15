@@ -192,7 +192,7 @@ const SubjectModal = ({ isOpen, mode, grade, subject, onClose, onSave }) => {
             />
           </div>
 
-          <div>
+          {/* <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Subject Code</label>
             <input
               type="text"
@@ -202,7 +202,7 @@ const SubjectModal = ({ isOpen, mode, grade, subject, onClose, onSave }) => {
               placeholder="e.g., MATH"
               maxLength={10}
             />
-          </div>
+          </div> */}
 
           <div className="grid grid-cols-2 gap-4">
             <div>

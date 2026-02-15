@@ -203,6 +203,24 @@ CREATE TABLE assessment_types (
 );
 
 -- =====================================================
+-- TABLE 11b: weight_templates
+-- Purpose: School Head defines weight templates that
+-- teachers can use as starting points for their weights
+-- =====================================================
+CREATE TABLE weight_templates (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    school_id INT NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    weights JSON NOT NULL,                         -- [{ assessment_type_id, assessment_type_name, weight_percent, max_score }]
+    is_default BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE
+);
+
+-- =====================================================
 -- TABLE 12: assessment_weights
 -- Purpose: Teacher-defined weights for their subject/class
 -- Teachers can adjust weights from School Head's suggestions

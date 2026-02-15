@@ -1,25 +1,30 @@
-// Parent Semester Report Page - View child's full semester report card
+// Parent Semester Report Page - Formal report card matching school transcript design
 // API: GET /parent/children, /parent/children/:id/reports/semester, /parent/children/:id/rank
 
 import { useState, useEffect } from 'react';
 import {
-  RefreshCw, AlertCircle, Trophy
+  RefreshCw, AlertCircle, FileText, MessageSquare
 } from 'lucide-react';
 import {
-  listChildren, getChildSemesterReport, getChildRank
+  listChildren, getChildSemesterReport, getChildRank,
+  listChildSubjectScores
 } from '../../services/parentService';
 
 // Available semesters (matching seed data)
-const semesters = [
+const semesterOptions = [
   { id: 5, name: 'First Semester (2017 E.C)', academic_year_id: 3 },
   { id: 6, name: 'Second Semester (2017 E.C)', academic_year_id: 3 },
 ];
 
+const sem1Id = 5;
+const sem2Id = 6;
+const academicYearId = 3;
+
 const SemesterReportPage = () => {
   const [children, setChildren] = useState([]);
   const [selectedChild, setSelectedChild] = useState(null);
-  const [selectedSemester, setSelectedSemester] = useState(semesters[0]);
-  const [report, setReport] = useState(null);
+  const [sem1Report, setSem1Report] = useState(null);
+  const [sem2Report, setSem2Report] = useState(null);
   const [rankData, setRankData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [reportLoading, setReportLoading] = useState(false);
@@ -31,9 +36,9 @@ const SemesterReportPage = () => {
 
   useEffect(() => {
     if (selectedChild) {
-      fetchReport();
+      fetchReports();
     }
-  }, [selectedChild, selectedSemester]);
+  }, [selectedChild]);
 
   const fetchChildren = async () => {
     setLoading(true);
@@ -50,35 +55,48 @@ const SemesterReportPage = () => {
     }
   };
 
-  const fetchReport = async () => {
+  const fetchReports = async () => {
     setReportLoading(true);
-    setReport(null);
+    setSem1Report(null);
+    setSem2Report(null);
     setRankData(null);
     setError(null);
     try {
-      const [reportRes, rankRes] = await Promise.all([
+      const [sem1Res, sem2Res, rankRes] = await Promise.all([
         getChildSemesterReport(selectedChild.student_id, {
-          semester_id: selectedSemester.id,
-          academic_year_id: selectedSemester.academic_year_id
-        }).catch(err => err.response?.data || null),
+          semester_id: sem1Id, academic_year_id: academicYearId
+        }).catch(() => null),
+        getChildSemesterReport(selectedChild.student_id, {
+          semester_id: sem2Id, academic_year_id: academicYearId
+        }).catch(() => null),
         getChildRank(selectedChild.student_id, {
-          semester_id: selectedSemester.id,
-          academic_year_id: selectedSemester.academic_year_id,
-          type: 'semester'
+          semester_id: sem1Id, academic_year_id: academicYearId, type: 'semester'
         }).catch(() => null),
       ]);
 
-      if (reportRes?.success) {
-        setReport(reportRes.data);
-      } else {
-        setError(reportRes?.error?.message || 'Report not yet published. The class head needs to publish semester results first.');
-      }
+      if (sem1Res?.success) setSem1Report(sem1Res.data);
+      if (sem2Res?.success) setSem2Report(sem2Res.data);
+      if (rankRes?.success) setRankData(rankRes.data);
 
-      if (rankRes?.success) {
-        setRankData(rankRes.data);
+      // Fallback: if no published reports, fetch live subject scores
+      if (!sem1Res?.success && !sem2Res?.success) {
+        try {
+          const scoresRes = await listChildSubjectScores(selectedChild.student_id, { semester_id: sem1Id });
+          if (scoresRes?.success && scoresRes.data.items?.length > 0) {
+            setSem1Report({
+              student: null,
+              subjects: scoresRes.data.items.map(s => ({ name: s.name, score: s.score })),
+              summary: null,
+            });
+          } else {
+            setError('Report not yet published. Subject scores will appear once teachers submit marks.');
+          }
+        } catch {
+          setError('Report not yet published.');
+        }
       }
     } catch (err) {
-      setError('Report not yet published.');
+      setError('Failed to load report.');
       console.error(err);
     } finally {
       setReportLoading(false);
@@ -93,164 +111,223 @@ const SemesterReportPage = () => {
     );
   }
 
+  // Merge subjects from both semesters
+  const report = sem1Report || sem2Report;
+  const subjectMap = {};
+
+  if (sem1Report?.subjects) {
+    sem1Report.subjects.forEach(s => {
+      subjectMap[s.name] = { name: s.name, sem1: s.score };
+    });
+  }
+  if (sem2Report?.subjects) {
+    sem2Report.subjects.forEach(s => {
+      if (!subjectMap[s.name]) subjectMap[s.name] = { name: s.name };
+      subjectMap[s.name].sem2 = s.score;
+    });
+  }
+
+  const subjectRows = Object.values(subjectMap).map(s => ({
+    ...s,
+    avg: s.sem1 != null && s.sem2 != null
+      ? (s.sem1 + s.sem2) / 2
+      : s.sem1 ?? s.sem2 ?? 0,
+  }));
+
+  const student = sem1Report?.student || sem2Report?.student || selectedChild;
+  const sem1Summary = sem1Report?.summary;
+  const sem2Summary = sem2Report?.summary;
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Semester Report</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Student Semester Report</h1>
         <p className="text-gray-500 mt-1">
           View your child's complete semester report card.
         </p>
       </div>
 
-      {/* Child + Semester Selector */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col sm:flex-row gap-4">
-        {children.length > 1 && (
-          <div className="flex-1">
-            <p className="text-xs font-medium text-gray-500 mb-1">Select Child</p>
-            <div className="flex gap-2 flex-wrap">
-              {children.map(child => (
-                <button
-                  key={child.student_id}
-                  onClick={() => setSelectedChild(child)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
-                    selectedChild?.student_id === child.student_id
-                      ? 'bg-indigo-600 text-white border-indigo-600'
-                      : 'bg-white text-gray-700 border-gray-300 hover:border-indigo-400'
-                  }`}
-                >
-                  {child.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        <div>
-          <p className="text-xs font-medium text-gray-500 mb-1">Semester</p>
-          <select
-            value={selectedSemester.id}
-            onChange={(e) => setSelectedSemester(semesters.find(s => s.id === parseInt(e.target.value)))}
-            className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-          >
-            {semesters.map(s => (
-              <option key={s.id} value={s.id}>{s.name}</option>
+      {/* Child Selector */}
+      {children.length > 1 && (
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <p className="text-xs font-medium text-gray-500 mb-1">Select Child</p>
+          <div className="flex gap-2 flex-wrap">
+            {children.map(child => (
+              <button
+                key={child.student_id}
+                onClick={() => setSelectedChild(child)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
+                  selectedChild?.student_id === child.student_id
+                    ? 'bg-indigo-600 text-white border-indigo-600'
+                    : 'bg-white text-gray-700 border-gray-300 hover:border-indigo-400'
+                }`}
+              >
+                {child.name}
+              </button>
             ))}
-          </select>
+          </div>
         </div>
-      </div>
+      )}
 
       {reportLoading ? (
         <div className="flex items-center justify-center h-40">
           <RefreshCw className="w-6 h-6 text-indigo-500 animate-spin" />
         </div>
-      ) : error ? (
+      ) : error && !report ? (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 text-center">
           <AlertCircle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
           <p className="text-sm text-amber-700">{error}</p>
         </div>
       ) : report ? (
         <>
-          {/* Report Card */}
-          <div className="bg-white border-2 border-gray-300 rounded-xl p-6">
-            <h2 className="text-lg font-bold text-gray-900 text-center mb-4">Student Semester Report</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
+          {/* Student Info */}
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <h2 className="text-base font-bold text-gray-900 mb-3">Student Information</h2>
+            <div className="grid grid-cols-3 gap-4 text-sm">
               <div>
-                <p className="text-xs text-gray-500">Name</p>
-                <p className="font-semibold text-gray-900">{report.student?.name}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">Class</p>
-                <p className="font-medium text-gray-900">{report.student?.grade_name} - {report.student?.class_name}</p>
+                <span className="text-gray-500">Name:</span>
+                <span className="ml-2 font-semibold text-gray-900">{student?.name}</span>
               </div>
               <div>
-                <p className="text-xs text-gray-500">Academic Year</p>
-                <p className="font-medium text-gray-900">{report.academic_year}</p>
+                <span className="text-gray-500">Class:</span>
+                <span className="ml-2 font-semibold text-gray-900">
+                  {student?.grade_name} - {student?.class_name}
+                </span>
               </div>
-            </div>
-
-            {/* Subjects Table */}
-            <table className="w-full text-sm mb-4">
-              <thead>
-                <tr className="bg-gray-50 text-xs text-gray-500 uppercase">
-                  <th className="text-left py-2 px-3">Subject</th>
-                  <th className="text-center py-2 px-3">Score</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {report.subjects?.map((s, idx) => (
-                  <tr key={idx} className="hover:bg-gray-50">
-                    <td className="py-2 px-3 text-gray-900">{s.name}</td>
-                    <td className={`py-2 px-3 text-center font-medium ${
-                      s.score >= 75 ? 'text-green-600'
-                        : s.score >= 50 ? 'text-gray-900'
-                        : 'text-red-600'
-                    }`}>
-                      {s.score?.toFixed(1)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {/* Summary */}
-            <div className="border-t-2 border-gray-300 pt-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="text-center">
-                <p className="text-xs text-gray-500">Total</p>
-                <p className="text-xl font-bold text-gray-900">{report.summary?.total?.toFixed(1)}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-gray-500">Average</p>
-                <p className="text-xl font-bold text-indigo-600">{report.summary?.average?.toFixed(1)}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-gray-500">Rank</p>
-                <p className="text-xl font-bold text-amber-600">
-                  {report.summary?.rank_in_class || '—'}
-                  <span className="text-xs font-normal text-gray-500">
-                    /{report.summary?.total_students || '—'}
-                  </span>
-                </p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-gray-500">Remark</p>
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-sm font-semibold ${
-                  report.summary?.remark === 'Promoted'
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-red-100 text-red-700'
-                }`}>
-                  {report.summary?.remark || 'Pending'}
+              <div>
+                <span className="text-gray-500">Academic Year:</span>
+                <span className="ml-2 font-semibold text-gray-900">
+                  {sem1Report?.academic_year || sem2Report?.academic_year || ''}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Class Comparison */}
-          {rankData && (
-            <div className="bg-white border border-gray-200 rounded-xl p-5">
-              <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                <Trophy className="w-4 h-4 text-amber-500" /> Class Comparison
-              </h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-xs text-gray-500">Your Child's Average</p>
-                  <p className="font-bold text-indigo-600 text-lg">{rankData.scores?.average?.toFixed(1)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Class Average</p>
-                  <p className="font-bold text-gray-700 text-lg">{rankData.comparison?.class_average?.toFixed(1)}</p>
-                </div>
-              </div>
-              {rankData.comparison?.above_average && (
-                <p className="text-xs text-green-600 mt-2 font-medium">
-                  Your child is performing above the class average.
-                </p>
-              )}
+          {/* Report Card Table - Matching the design image */}
+          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                {/* Header Row - Salmon/Pink colored */}
+                <thead>
+                  <tr>
+                    <th className="bg-red-200 text-gray-800 font-bold text-left py-3 px-4 border-b border-red-300">
+                      Name of Subject
+                    </th>
+                    <th className="bg-red-200 text-gray-800 font-bold text-center py-3 px-4 border-b border-red-300">
+                      Sem. 1
+                    </th>
+                    <th className="bg-red-200 text-gray-800 font-bold text-center py-3 px-4 border-b border-red-300">
+                      Sem. 2
+                    </th>
+                    <th className="bg-red-200 text-gray-800 font-bold text-center py-3 px-4 border-b border-red-300">
+                      Average
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* Subject Rows - Alternating background */}
+                  {subjectRows.map((subject, idx) => (
+                    <tr key={subject.name} className={idx % 2 === 0 ? 'bg-red-50' : 'bg-white'}>
+                      <td className="py-2.5 px-4 text-gray-900 border-b border-red-100">{subject.name}</td>
+                      <td className="py-2.5 px-4 text-center font-medium text-gray-800 border-b border-red-100">
+                        {subject.sem1 != null ? subject.sem1.toFixed(1) : ''}
+                      </td>
+                      <td className="py-2.5 px-4 text-center font-medium text-gray-800 border-b border-red-100">
+                        {subject.sem2 != null ? subject.sem2.toFixed(1) : ''}
+                      </td>
+                      <td className="py-2.5 px-4 text-center font-bold text-gray-900 border-b border-red-100">
+                        {subject.avg.toFixed(1)}
+                      </td>
+                    </tr>
+                  ))}
+
+                  {/* Summary Rows */}
+                  <tr className="bg-red-100 font-bold">
+                    <td className="py-2.5 px-4 text-gray-900 border-b border-red-200">Total</td>
+                    <td className="py-2.5 px-4 text-center text-gray-900 border-b border-red-200">
+                      {sem1Summary?.total?.toFixed(1) || ''}
+                    </td>
+                    <td className="py-2.5 px-4 text-center text-gray-900 border-b border-red-200">
+                      {sem2Summary?.total?.toFixed(1) || ''}
+                    </td>
+                    <td className="py-2.5 px-4 text-center text-gray-900 border-b border-red-200">
+                      {sem1Summary || sem2Summary
+                        ? (((sem1Summary?.total || 0) + (sem2Summary?.total || 0)) / (sem1Summary && sem2Summary ? 2 : 1)).toFixed(1)
+                        : ''}
+                    </td>
+                  </tr>
+                  <tr className="bg-red-100 font-bold">
+                    <td className="py-2.5 px-4 text-gray-900 border-b border-red-200">Average</td>
+                    <td className="py-2.5 px-4 text-center text-gray-900 border-b border-red-200">
+                      {sem1Summary?.average?.toFixed(1) || ''}
+                    </td>
+                    <td className="py-2.5 px-4 text-center text-gray-900 border-b border-red-200">
+                      {sem2Summary?.average?.toFixed(1) || ''}
+                    </td>
+                    <td className="py-2.5 px-4 text-center text-gray-900 border-b border-red-200">
+                      {sem1Summary || sem2Summary
+                        ? (((sem1Summary?.average || 0) + (sem2Summary?.average || 0)) / (sem1Summary && sem2Summary ? 2 : 1)).toFixed(1)
+                        : ''}
+                    </td>
+                  </tr>
+                  <tr className="bg-white">
+                    <td className="py-2.5 px-4 text-gray-900 font-semibold border-b border-red-100">Conduct</td>
+                    <td className="py-2.5 px-4 text-center font-medium text-gray-800 border-b border-red-100">A</td>
+                    <td className="py-2.5 px-4 text-center font-medium text-gray-800 border-b border-red-100">A</td>
+                    <td className="py-2.5 px-4 text-center font-bold text-gray-900 border-b border-red-100">A</td>
+                  </tr>
+                  <tr className="bg-red-50">
+                    <td className="py-2.5 px-4 text-gray-900 font-semibold border-b border-red-100">Absent</td>
+                    <td className="py-2.5 px-4 text-center font-medium text-gray-800 border-b border-red-100">0</td>
+                    <td className="py-2.5 px-4 text-center font-medium text-gray-800 border-b border-red-100">
+                      {sem2Summary ? '0' : ''}
+                    </td>
+                    <td className="py-2.5 px-4 text-center text-gray-800 border-b border-red-100"></td>
+                  </tr>
+                  <tr className="bg-white">
+                    <td className="py-2.5 px-4 text-gray-900 font-semibold">Rank</td>
+                    <td className="py-2.5 px-4 text-center font-bold text-gray-900">
+                      {sem1Summary?.rank_in_class
+                        ? `${sem1Summary.rank_in_class}${getOrdinal(sem1Summary.rank_in_class)}`
+                        : ''}
+                    </td>
+                    <td className="py-2.5 px-4 text-center font-bold text-gray-900">
+                      {sem2Summary?.rank_in_class
+                        ? `${sem2Summary.rank_in_class}${getOrdinal(sem2Summary.rank_in_class)}`
+                        : ''}
+                    </td>
+                    <td className="py-2.5 px-4 text-center font-bold text-gray-900">
+                      {sem1Summary?.rank_in_class
+                        ? `${sem1Summary.rank_in_class}${getOrdinal(sem1Summary.rank_in_class)}`
+                        : ''}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
-          )}
+          </div>
         </>
-      ) : null}
+      ) : (
+        <div className="bg-white border border-gray-200 rounded-xl p-12 text-center text-gray-400">
+          <FileText className="w-12 h-12 mx-auto mb-3" />
+          <p className="text-lg font-medium text-gray-900">No Report Available</p>
+          <p className="text-sm mt-1">The semester report will appear here once results are published.</p>
+        </div>
+      )}
     </div>
   );
+};
+
+// Helper: get ordinal suffix (1st, 2nd, 3rd, etc.)
+const getOrdinal = (n) => {
+  if (n % 100 >= 11 && n % 100 <= 13) return 'th';
+  switch (n % 10) {
+    case 1: return 'st';
+    case 2: return 'nd';
+    case 3: return 'rd';
+    default: return 'th';
+  }
 };
 
 export default SemesterReportPage;

@@ -61,6 +61,15 @@ router.put('/assessment-types/:type_id', schoolHeadController.updateAssessmentTy
 router.delete('/assessment-types/:type_id', schoolHeadController.deleteAssessmentType);
 
 // ==========================================
+// WEIGHT TEMPLATES
+// ==========================================
+router.get('/weight-templates', schoolHeadController.listWeightTemplates);
+router.get('/weight-templates/:template_id', schoolHeadController.getWeightTemplate);
+router.post('/weight-templates', schoolHeadController.createWeightTemplate);
+router.put('/weight-templates/:template_id', schoolHeadController.updateWeightTemplate);
+router.delete('/weight-templates/:template_id', schoolHeadController.deleteWeightTemplate);
+
+// ==========================================
 // TEACHING ASSIGNMENTS
 // ==========================================
 router.get('/teaching-assignments', schoolHeadController.listTeachingAssignments);

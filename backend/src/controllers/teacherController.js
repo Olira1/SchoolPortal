@@ -166,6 +166,8 @@ const listAssignedSubjects = async (req, res) => {
 /**
  * GET /api/v1/teacher/assessment-weights/suggestions
  * Get suggested weights from school head
+ * First checks weight_templates for a default template,
+ * then falls back to assessment_types.default_weight_percent
  */
 const getWeightSuggestions = async (req, res) => {
   try {
@@ -183,7 +185,41 @@ const getWeightSuggestions = async (req, res) => {
       });
     }
 
-    // Get assessment types with default weights
+    // First, check if the school head has created a weight template
+    // Prefer the default template; if none is default, use the most recently created one
+    const [templates] = await pool.query(
+      'SELECT * FROM weight_templates WHERE school_id = ? ORDER BY is_default DESC, created_at DESC LIMIT 1',
+      [schoolId]
+    );
+
+    if (templates.length > 0) {
+      // Use weight template weights
+      const template = templates[0];
+      const templateWeights = typeof template.weights === 'string'
+        ? JSON.parse(template.weights)
+        : (template.weights || []);
+
+      // Map template weights, ensuring each has assessment_type_name
+      const suggestedWeights = templateWeights.map(w => ({
+        assessment_type_id: w.assessment_type_id,
+        assessment_type_name: w.assessment_type_name || w.name || '',
+        weight_percent: parseFloat(w.weight_percent) || 0
+      }));
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          class_id: parseInt(class_id),
+          subject_id: parseInt(subject_id),
+          source: 'weight_template',
+          template_name: template.name,
+          suggested_weights: suggestedWeights
+        },
+        error: null
+      });
+    }
+
+    // Fallback: get assessment types with their default weights
     const [types] = await pool.query(
       'SELECT id as assessment_type_id, name as assessment_type_name, default_weight_percent as weight_percent FROM assessment_types WHERE school_id = ?',
       [schoolId]
@@ -194,6 +230,7 @@ const getWeightSuggestions = async (req, res) => {
       data: {
         class_id: parseInt(class_id),
         subject_id: parseInt(subject_id),
+        source: 'assessment_type_defaults',
         suggested_weights: types
       },
       error: null
