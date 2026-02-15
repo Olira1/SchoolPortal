@@ -97,12 +97,12 @@ const GradeEntryPage = () => {
     }
   };
 
-  // Get all unique assessment types from grade data
+  // Get all unique assessment types from grade data (parse numbers since MySQL returns decimals as strings)
   const assessmentTypes = gradeData?.items?.[0]?.grades?.map(g => ({
     id: g.assessment_type_id,
     name: g.assessment_type_name,
-    max_score: g.max_score,
-    weight_percent: g.weight_percent
+    max_score: parseFloat(g.max_score) || 0,
+    weight_percent: parseFloat(g.weight_percent) || 0
   })) || [];
 
   // Handle score change in the grid
@@ -126,6 +126,23 @@ const GradeEntryPage = () => {
   const getGradeId = (student, assessmentTypeId) => {
     const grade = student.grades?.find(g => g.assessment_type_id === assessmentTypeId);
     return grade?.id;
+  };
+
+  // Compute total weighted score for a student from visible grades
+  const computeTotal = (student) => {
+    let total = 0;
+    let hasAnyScore = false;
+    for (const at of assessmentTypes) {
+      const cellVal = getCellValue(student, at.id);
+      const score = parseFloat(cellVal);
+      const maxScore = parseFloat(at.max_score) || 100;
+      const weight = parseFloat(at.weight_percent) || 0;
+      if (!isNaN(score) && score !== '' && cellVal !== '') {
+        total += (score / maxScore) * weight;
+        hasAnyScore = true;
+      }
+    }
+    return hasAnyScore ? Math.round(total * 100) / 100 : null;
   };
 
   // Save all edited grades (bulk)
@@ -371,10 +388,10 @@ const GradeEntryPage = () => {
                         );
                       })}
                       <td className="px-3 py-3 text-center font-semibold text-gray-900">
-                        {student.total_weighted_score != null
-                          ? student.total_weighted_score.toFixed(1)
-                          : '-'
-                        }
+                        {(() => {
+                          const total = computeTotal(student);
+                          return total !== null ? total.toFixed(1) : '-';
+                        })()}
                       </td>
                     </tr>
                   ))}

@@ -471,7 +471,7 @@ const listStudentGrades = async (req, res) => {
         [student.student_id, assignment.id, semester_id]
       );
 
-      const totalWeightedScore = marks.reduce((sum, m) => sum + (m.weighted_score || 0), 0);
+      const totalWeightedScore = marks.reduce((sum, m) => sum + (parseFloat(m.weighted_score) || 0), 0);
 
       // Check submission status
       const [submissions] = await pool.query(

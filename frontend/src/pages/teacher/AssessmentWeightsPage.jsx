@@ -101,7 +101,7 @@ const AssessmentWeightsPage = () => {
         setWeights(weightsRes.data.weights.map(w => ({
           assessment_type_id: w.assessment_type_id,
           name: w.assessment_type_name || w.name || `Type ${w.assessment_type_id}`,
-          weight_percent: w.weight_percent
+          weight_percent: parseFloat(w.weight_percent) || 0
         })));
         setSource(weightsRes.data.source || 'teacher_defined');
       } else if (suggestionsRes?.success) {
@@ -110,7 +110,7 @@ const AssessmentWeightsPage = () => {
         setWeights(suggestedWeights.map(s => ({
           assessment_type_id: s.assessment_type_id,
           name: s.assessment_type_name || s.name || `Type ${s.assessment_type_id}`,
-          weight_percent: s.weight_percent || s.default_weight_percent || 0
+          weight_percent: parseFloat(s.weight_percent || s.default_weight_percent) || 0
         })));
         setSource('default');
       }
@@ -133,7 +133,7 @@ const AssessmentWeightsPage = () => {
       setWeights(suggestions.map(s => ({
         assessment_type_id: s.assessment_type_id,
         name: s.assessment_type_name || s.name || `Type ${s.assessment_type_id}`,
-        weight_percent: s.weight_percent || s.default_weight_percent || 0
+        weight_percent: parseFloat(s.weight_percent || s.default_weight_percent) || 0
       })));
       setSource('default');
       setSuccess(null);

@@ -147,6 +147,35 @@ const GradeEntryPage = () => {
     }));
   };
 
+  // Compute total weighted score for a student from current grades
+  const computeStudentTotal = (student) => {
+    const types = getAssessmentTypes();
+    let total = 0;
+    let hasAnyScore = false;
+    for (const at of types) {
+      // Check edited grades first, then original grade data
+      const edited = editedGrades[student.student_id]?.[at.id];
+      const score = edited?.score !== undefined && edited?.score !== '' ? parseFloat(edited.score) : null;
+      if (score === null) {
+        // fallback to original grade
+        const origGrade = student.grades?.find(g => g.assessment_type_id === at.id);
+        if (origGrade && origGrade.score != null) {
+          const origScore = parseFloat(origGrade.score);
+          const maxScore = parseFloat(at.max_score) || 100;
+          const weight = parseFloat(at.weight_percent) || 0;
+          total += (origScore / maxScore) * weight;
+          hasAnyScore = true;
+        }
+      } else {
+        const maxScore = parseFloat(at.max_score) || 100;
+        const weight = parseFloat(at.weight_percent) || 0;
+        total += (score / maxScore) * weight;
+        hasAnyScore = true;
+      }
+    }
+    return hasAnyScore ? Math.round(total * 100) / 100 : null;
+  };
+
   // Get unique assessment types from grade data
   const getAssessmentTypes = () => {
     if (!gradeData?.items?.length) return [];
@@ -158,8 +187,8 @@ const GradeEntryPage = () => {
           typesMap[grade.assessment_type_id] = {
             id: grade.assessment_type_id,
             name: grade.assessment_type_name,
-            max_score: grade.max_score,
-            weight_percent: grade.weight_percent,
+            max_score: parseFloat(grade.max_score) || 0,
+            weight_percent: parseFloat(grade.weight_percent) || 0,
           };
         }
       });
@@ -456,9 +485,10 @@ const GradeEntryPage = () => {
                       );
                     })}
                     <td className="px-4 py-3 text-center text-sm font-medium text-gray-900">
-                      {student.total_weighted_score != null
-                        ? student.total_weighted_score.toFixed(1)
-                        : '—'}
+                      {(() => {
+                        const total = computeStudentTotal(student);
+                        return total !== null ? total.toFixed(1) : '—';
+                      })()}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
