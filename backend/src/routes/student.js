@@ -21,12 +21,23 @@ router.get('/reports/semester', studentController.getSemesterReport);
 // ==========================================
 // SUBJECTS
 // ==========================================
+router.get('/subjects/scores', studentController.listSubjectScores);
 router.get('/subjects/:subject_id/grades', studentController.getSubjectGrades);
+
+// ==========================================
+// YEAR REPORT
+// ==========================================
+router.get('/reports/year', studentController.getYearReport);
 
 // ==========================================
 // RANK
 // ==========================================
 router.get('/rank', studentController.getRank);
+
+// ==========================================
+// TEACHER REMARKS
+// ==========================================
+router.get('/remarks', studentController.getRemarks);
 
 module.exports = router;
 

@@ -59,9 +59,9 @@ const getSemesterReport = async (req, res) => {
 
     const result = results[0];
 
-    // Get subject scores
+    // Get subject scores (include subject id for detail navigation)
     const [subjects] = await pool.query(
-      `SELECT s.name,
+      `SELECT s.id as subject_id, s.name,
               SUM(m.score / m.max_score * COALESCE(aw.weight_percent, at.default_weight_percent)) as score
        FROM marks m
        JOIN teaching_assignments ta ON m.teaching_assignment_id = ta.id
@@ -95,8 +95,9 @@ const getSemesterReport = async (req, res) => {
         semester: semesterInfo[0]?.name,
         academic_year: yearInfo[0]?.name,
         subjects: subjects.map(s => ({
+          id: s.subject_id,
           name: s.name,
-          score: Math.round((s.score || 0) * 100) / 100
+          score: Math.round((parseFloat(s.score) || 0) * 100) / 100
         })),
         summary: {
           total: parseFloat(result.total_score) || 0,
@@ -186,9 +187,9 @@ const getSubjectGrades = async (req, res) => {
       [student.id, assignments[0].id, semester_id]
     );
 
-    // Calculate summary
-    const subjectTotal = assessments.reduce((sum, a) => sum + (a.score || 0), 0);
-    const subjectAverage = assessments.reduce((sum, a) => sum + (a.weighted_score || 0), 0);
+    // Calculate summary (parseFloat to handle MySQL DECIMAL strings)
+    const subjectTotal = assessments.reduce((sum, a) => sum + (parseFloat(a.score) || 0), 0);
+    const subjectAverage = assessments.reduce((sum, a) => sum + (parseFloat(a.weighted_score) || 0), 0);
 
     return res.status(200).json({
       success: true,
@@ -198,10 +199,10 @@ const getSubjectGrades = async (req, res) => {
         semester: semesterInfo[0]?.name,
         assessments: assessments.map(a => ({
           type: a.type,
-          score: a.score,
-          max_score: a.max_score,
-          weight_percent: parseFloat(a.weight_percent),
-          weighted_score: Math.round((a.weighted_score || 0) * 100) / 100,
+          score: parseFloat(a.score) || 0,
+          max_score: parseFloat(a.max_score) || 0,
+          weight_percent: parseFloat(a.weight_percent) || 0,
+          weighted_score: Math.round((parseFloat(a.weighted_score) || 0) * 100) / 100,
           date: a.date
         })),
         summary: {
@@ -349,11 +350,247 @@ const getProfile = async (req, res) => {
   }
 };
 
+// ==========================================
+// LIST SUBJECT SCORES (without requiring published results)
+// ==========================================
+
+/**
+ * GET /api/v1/student/subjects
+ * List all subjects with their total scores for a given semester (from marks)
+ */
+const listSubjectScores = async (req, res) => {
+  try {
+    const { semester_id } = req.query;
+    const student = await getStudentInfo(req.user.id);
+
+    if (!student) {
+      return res.status(404).json({
+        success: false, data: null,
+        error: { code: 'NOT_FOUND', message: 'Student profile not found.' }
+      });
+    }
+
+    // Get subject scores directly from marks table (no need for published results)
+    const [subjects] = await pool.query(
+      `SELECT s.id as subject_id, s.name,
+              SUM(m.score / m.max_score * COALESCE(aw.weight_percent, at.default_weight_percent)) as score
+       FROM marks m
+       JOIN teaching_assignments ta ON m.teaching_assignment_id = ta.id
+       JOIN subjects s ON ta.subject_id = s.id
+       JOIN assessment_types at ON m.assessment_type_id = at.id
+       LEFT JOIN assessment_weights aw ON aw.teaching_assignment_id = m.teaching_assignment_id
+                                       AND aw.assessment_type_id = m.assessment_type_id
+                                       AND aw.semester_id = m.semester_id
+       WHERE m.student_id = ? AND m.semester_id = ? AND ta.class_id = ?
+       GROUP BY s.id, s.name
+       ORDER BY s.name`,
+      [student.id, semester_id, student.class_id]
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        items: subjects.map(s => ({
+          id: s.subject_id,
+          name: s.name,
+          score: Math.round((parseFloat(s.score) || 0) * 100) / 100
+        }))
+      },
+      error: null
+    });
+  } catch (error) {
+    console.error('List subject scores error:', error);
+    return res.status(500).json({
+      success: false, data: null,
+      error: { code: 'INTERNAL_ERROR', message: 'Failed to fetch subject scores.' }
+    });
+  }
+};
+
+// ==========================================
+// VIEW YEAR REPORT
+// ==========================================
+
+/**
+ * GET /api/v1/student/reports/year
+ * View year grade report (combines both semesters)
+ */
+const getYearReport = async (req, res) => {
+  try {
+    const { academic_year_id } = req.query;
+    const student = await getStudentInfo(req.user.id);
+
+    if (!student) {
+      return res.status(404).json({
+        success: false, data: null,
+        error: { code: 'NOT_FOUND', message: 'Student profile not found.' }
+      });
+    }
+
+    const [yearInfo] = await pool.query('SELECT id, name FROM academic_years WHERE id = ?', [academic_year_id]);
+    if (yearInfo.length === 0) {
+      return res.status(404).json({
+        success: false, data: null,
+        error: { code: 'NOT_FOUND', message: 'Academic year not found.' }
+      });
+    }
+
+    // Get both semesters for this academic year
+    const [semesters] = await pool.query(
+      'SELECT id, name, semester_number FROM semesters WHERE academic_year_id = ? ORDER BY semester_number',
+      [academic_year_id]
+    );
+
+    // Get all subjects for this class
+    const [subjectsData] = await pool.query(
+      `SELECT DISTINCT s.id, s.name FROM subjects s
+       JOIN teaching_assignments ta ON ta.subject_id = s.id
+       WHERE ta.class_id = ? ORDER BY s.name`,
+      [student.class_id]
+    );
+
+    // For each subject, get scores per semester
+    const subjects = [];
+    for (const subject of subjectsData) {
+      const subjectRow = { name: subject.name };
+
+      for (const sem of semesters) {
+        const [scores] = await pool.query(
+          `SELECT SUM(m.score / m.max_score * COALESCE(aw.weight_percent, at.default_weight_percent)) as score
+           FROM marks m
+           JOIN teaching_assignments ta ON m.teaching_assignment_id = ta.id
+           JOIN assessment_types at ON m.assessment_type_id = at.id
+           LEFT JOIN assessment_weights aw ON aw.teaching_assignment_id = m.teaching_assignment_id
+                                           AND aw.assessment_type_id = m.assessment_type_id
+                                           AND aw.semester_id = m.semester_id
+           WHERE m.student_id = ? AND m.semester_id = ? AND ta.subject_id = ? AND ta.class_id = ?`,
+          [student.id, sem.id, subject.id, student.class_id]
+        );
+        const score = Math.round((parseFloat(scores[0]?.score) || 0) * 100) / 100;
+        if (sem.semester_number === 1) subjectRow.first_semester = score;
+        else subjectRow.second_semester = score;
+      }
+
+      subjectRow.year_average = Math.round(
+        ((subjectRow.first_semester || 0) + (subjectRow.second_semester || 0)) / 2 * 100
+      ) / 100;
+      subjects.push(subjectRow);
+    }
+
+    // Semester summaries
+    const semesterSummaries = [];
+    for (const sem of semesters) {
+      const total = subjects.reduce((sum, s) => {
+        return sum + (sem.semester_number === 1 ? (s.first_semester || 0) : (s.second_semester || 0));
+      }, 0);
+      const avg = subjectsData.length > 0 ? total / subjectsData.length : 0;
+      semesterSummaries.push({
+        name: sem.name,
+        total: Math.round(total * 100) / 100,
+        average: Math.round(avg * 100) / 100
+      });
+    }
+
+    // Year totals
+    const yearTotal = subjects.reduce((sum, s) => sum + (s.year_average || 0), 0);
+    const yearAvg = subjectsData.length > 0 ? yearTotal / subjectsData.length : 0;
+
+    // Get total students
+    const [totalStudents] = await pool.query(
+      'SELECT COUNT(*) as count FROM students WHERE class_id = ?', [student.class_id]
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        student: {
+          id: student.id, code: student.code, name: student.name,
+          class_name: student.class_name, grade_name: student.grade_name
+        },
+        academic_year: yearInfo[0].name,
+        semesters: semesterSummaries,
+        subjects: subjects,
+        summary: {
+          year_total: Math.round(yearTotal * 100) / 100,
+          year_average: Math.round(yearAvg * 100) / 100,
+          total_students: totalStudents[0].count,
+          remark: yearAvg >= 50 ? 'Promoted' : 'Not Promoted'
+        },
+        status: 'available'
+      },
+      error: null
+    });
+  } catch (error) {
+    console.error('Get year report error:', error);
+    return res.status(500).json({
+      success: false, data: null,
+      error: { code: 'INTERNAL_ERROR', message: 'Failed to fetch year report.' }
+    });
+  }
+};
+
+// ==========================================
+// VIEW TEACHER REMARKS
+// ==========================================
+
+/**
+ * GET /api/v1/student/remarks
+ * View teacher/class head remarks
+ */
+const getRemarks = async (req, res) => {
+  try {
+    const { semester_id } = req.query;
+    const student = await getStudentInfo(req.user.id);
+
+    if (!student) {
+      return res.status(404).json({
+        success: false, data: null,
+        error: { code: 'NOT_FOUND', message: 'Student profile not found.' }
+      });
+    }
+
+    // Get grade submission comments as subject remarks
+    const [subjectRemarks] = await pool.query(
+      `SELECT s.name as subject_name, u.name as teacher_name, gs.comments as remark, gs.reviewed_at as date
+       FROM grade_submissions gs
+       JOIN teaching_assignments ta ON gs.teaching_assignment_id = ta.id
+       JOIN subjects s ON ta.subject_id = s.id
+       JOIN users u ON ta.teacher_id = u.id
+       WHERE ta.class_id = ? AND gs.semester_id = ? AND gs.comments IS NOT NULL AND gs.comments != ''`,
+      [student.class_id, semester_id]
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        class_head_remark: null,
+        subject_remarks: subjectRemarks.map(r => ({
+          subject_name: r.subject_name,
+          teacher_name: r.teacher_name,
+          remark: r.remark,
+          date: r.date
+        })),
+        remarks_enabled: true
+      },
+      error: null
+    });
+  } catch (error) {
+    console.error('Get remarks error:', error);
+    return res.status(500).json({
+      success: false, data: null,
+      error: { code: 'INTERNAL_ERROR', message: 'Failed to fetch remarks.' }
+    });
+  }
+};
+
 module.exports = {
   getSemesterReport,
   getSubjectGrades,
   getRank,
-  getProfile
+  getProfile,
+  listSubjectScores,
+  getYearReport,
+  getRemarks
 };
 
 

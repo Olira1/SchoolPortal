@@ -167,14 +167,14 @@ export const navigationConfig = {
   // Student Navigation
   student: [
     {
-      name: 'Dashboard',
+      name: 'My Dashboard',
       path: '/student',
       icon: LayoutDashboard,
     },
     {
-      name: 'My Profile',
-      path: '/student/profile',
-      icon: Users,
+      name: 'Subject Marks',
+      path: '/student/subjects',
+      icon: BookOpen,
     },
     {
       name: 'Semester Report',
@@ -185,11 +185,6 @@ export const navigationConfig = {
       name: 'Year Report',
       path: '/student/year-report',
       icon: FileSpreadsheet,
-    },
-    {
-      name: 'Subject Grades',
-      path: '/student/subjects',
-      icon: BookOpen,
     },
     {
       name: 'My Rank',

@@ -48,6 +48,15 @@ import {
   SendRosterPage
 } from './pages/classHead';
 
+// Student Pages
+import {
+  StudentDashboard,
+  SubjectGradesPage,
+  SemesterReportPage,
+  YearReportPage,
+  RankPage
+} from './pages/student';
+
 function App() {
   return (
     <BrowserRouter>
@@ -139,12 +148,11 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<Dashboard />} />
-            <Route path="profile" element={<Dashboard />} />
-            <Route path="semester-report" element={<Dashboard />} />
-            <Route path="year-report" element={<Dashboard />} />
-            <Route path="subjects" element={<Dashboard />} />
-            <Route path="rank" element={<Dashboard />} />
+            <Route index element={<StudentDashboard />} />
+            <Route path="subjects" element={<SubjectGradesPage />} />
+            <Route path="semester-report" element={<SemesterReportPage />} />
+            <Route path="year-report" element={<YearReportPage />} />
+            <Route path="rank" element={<RankPage />} />
           </Route>
 
           {/* Parent Routes */}
