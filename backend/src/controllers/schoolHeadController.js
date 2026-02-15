@@ -794,8 +794,134 @@ const createSubject = async (req, res) => {
 };
 
 /**
+ * POST /api/v1/school/grades/:grade_id/subjects
+ * Add a subject to a specific grade (API contract endpoint)
+ * Note: In current schema, subjects are school-wide, not grade-specific.
+ * This endpoint accepts grade_id for API compliance but creates school-wide subjects.
+ */
+const addSubjectToGrade = async (req, res) => {
+  try {
+    const schoolId = req.user.school_id;
+    const { grade_id } = req.params;
+    const { name, code, credit_hours, is_required, description } = req.body;
+
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        data: null,
+        error: { code: 'VALIDATION_ERROR', message: 'Subject name is required.' }
+      });
+    }
+
+    // Verify grade exists and belongs to this school
+    const [grade] = await pool.query(
+      'SELECT id, name FROM grades WHERE id = ? AND school_id = ?',
+      [grade_id, schoolId]
+    );
+
+    if (grade.length === 0) {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        error: { code: 'NOT_FOUND', message: 'Grade not found.' }
+      });
+    }
+
+    // Check if subject already exists for this school
+    const [existing] = await pool.query(
+      'SELECT id FROM subjects WHERE school_id = ? AND name = ?',
+      [schoolId, name]
+    );
+
+    if (existing.length > 0) {
+      return res.status(409).json({
+        success: false,
+        data: null,
+        error: { code: 'CONFLICT', message: 'Subject already exists for this school.' }
+      });
+    }
+
+    // Create subject (school-wide in current schema)
+    const [result] = await pool.query(
+      'INSERT INTO subjects (school_id, name) VALUES (?, ?)',
+      [schoolId, name]
+    );
+
+    // Return response matching API contract format
+    return res.status(201).json({
+      success: true,
+      data: {
+        id: result.insertId,
+        name,
+        code: code || null,
+        credit_hours: credit_hours || null,
+        is_required: is_required || false,
+        description: description || null,
+        grade_id: parseInt(grade_id),
+        school_id: schoolId,
+        created_at: new Date().toISOString()
+      },
+      error: null
+    });
+  } catch (error) {
+    console.error('Add subject to grade error:', error);
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: { code: 'INTERNAL_ERROR', message: 'Failed to add subject.' }
+    });
+  }
+};
+
+/**
+ * GET /api/v1/school/grades/:grade_id/subjects
+ * List subjects for a specific grade (API contract endpoint)
+ * Note: In current schema, subjects are school-wide.
+ * Returns all school subjects filtered by grade context.
+ */
+const listSubjectsByGrade = async (req, res) => {
+  try {
+    const schoolId = req.user.school_id;
+    const { grade_id } = req.params;
+
+    // Verify grade exists and belongs to this school
+    const [grade] = await pool.query(
+      'SELECT id, name FROM grades WHERE id = ? AND school_id = ?',
+      [grade_id, schoolId]
+    );
+
+    if (grade.length === 0) {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        error: { code: 'NOT_FOUND', message: 'Grade not found.' }
+      });
+    }
+
+    // Return all subjects for this school (school-wide in current schema)
+    const [subjects] = await pool.query(
+      'SELECT * FROM subjects WHERE school_id = ? ORDER BY name',
+      [schoolId]
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: { items: subjects },
+      error: null
+    });
+  } catch (error) {
+    console.error('List subjects by grade error:', error);
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: { code: 'INTERNAL_ERROR', message: 'Failed to fetch subjects.' }
+    });
+  }
+};
+
+/**
  * PUT /api/v1/school/subjects/:subject_id
- * Update subject
+ * Update subject (flat route - kept for backward compatibility)
  */
 const updateSubject = async (req, res) => {
   try {
@@ -834,8 +960,75 @@ const updateSubject = async (req, res) => {
 };
 
 /**
+ * PUT /api/v1/school/grades/:grade_id/subjects/:subject_id
+ * Update subject under a grade (API contract endpoint)
+ */
+const updateSubjectInGrade = async (req, res) => {
+  try {
+    const { grade_id, subject_id } = req.params;
+    const schoolId = req.user.school_id;
+    const { name, code, credit_hours, is_required, description } = req.body;
+
+    // Verify grade belongs to this school
+    const [grade] = await pool.query(
+      'SELECT id FROM grades WHERE id = ? AND school_id = ?',
+      [grade_id, schoolId]
+    );
+
+    if (grade.length === 0) {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        error: { code: 'NOT_FOUND', message: 'Grade not found.' }
+      });
+    }
+
+    // Verify subject exists and belongs to this school
+    const [existing] = await pool.query(
+      'SELECT * FROM subjects WHERE id = ? AND school_id = ?',
+      [subject_id, schoolId]
+    );
+
+    if (existing.length === 0) {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        error: { code: 'NOT_FOUND', message: 'Subject not found.' }
+      });
+    }
+
+    // Update the subject name if provided
+    if (name) {
+      await pool.query('UPDATE subjects SET name = ? WHERE id = ?', [name, subject_id]);
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        id: parseInt(subject_id),
+        name: name || existing[0].name,
+        code: code || null,
+        credit_hours: credit_hours || null,
+        is_required: is_required || false,
+        description: description || null,
+        grade_id: parseInt(grade_id),
+        updated: true
+      },
+      error: null
+    });
+  } catch (error) {
+    console.error('Update subject in grade error:', error);
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: { code: 'INTERNAL_ERROR', message: 'Failed to update subject.' }
+    });
+  }
+};
+
+/**
  * DELETE /api/v1/school/subjects/:subject_id
- * Delete subject
+ * Delete subject (flat route - kept for backward compatibility)
  */
 const deleteSubject = async (req, res) => {
   try {
@@ -882,6 +1075,74 @@ const deleteSubject = async (req, res) => {
       success: false,
       data: null,
       error: { code: 'INTERNAL_ERROR', message: 'Failed to delete subject.' }
+    });
+  }
+};
+
+/**
+ * DELETE /api/v1/school/grades/:grade_id/subjects/:subject_id
+ * Remove subject from a grade (API contract endpoint)
+ */
+const removeSubjectFromGrade = async (req, res) => {
+  try {
+    const { grade_id, subject_id } = req.params;
+    const schoolId = req.user.school_id;
+
+    // Verify grade belongs to this school
+    const [grade] = await pool.query(
+      'SELECT id FROM grades WHERE id = ? AND school_id = ?',
+      [grade_id, schoolId]
+    );
+
+    if (grade.length === 0) {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        error: { code: 'NOT_FOUND', message: 'Grade not found.' }
+      });
+    }
+
+    // Verify subject exists and belongs to this school
+    const [existing] = await pool.query(
+      'SELECT * FROM subjects WHERE id = ? AND school_id = ?',
+      [subject_id, schoolId]
+    );
+
+    if (existing.length === 0) {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        error: { code: 'NOT_FOUND', message: 'Subject not found.' }
+      });
+    }
+
+    // Check for teaching assignments
+    const [assignments] = await pool.query(
+      'SELECT COUNT(*) as count FROM teaching_assignments WHERE subject_id = ?',
+      [subject_id]
+    );
+
+    if (assignments[0].count > 0) {
+      return res.status(409).json({
+        success: false,
+        data: null,
+        error: { code: 'CONFLICT', message: 'Cannot remove subject. It has active teaching assignments.' }
+      });
+    }
+
+    await pool.query('DELETE FROM subjects WHERE id = ?', [subject_id]);
+
+    return res.status(200).json({
+      success: true,
+      data: { message: 'Subject removed from grade successfully' },
+      error: null
+    });
+  } catch (error) {
+    console.error('Remove subject from grade error:', error);
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: { code: 'INTERNAL_ERROR', message: 'Failed to remove subject.' }
     });
   }
 };
@@ -1430,8 +1691,10 @@ module.exports = {
   listClassesByGrade, createClassUnderGrade,
   // Classes (direct access)
   listClasses, getClass, createClass, updateClass, deleteClass,
-  // Subjects
+  // Subjects (flat routes)
   listSubjects, createSubject, updateSubject, deleteSubject,
+  // Subjects (nested under grades - API contract)
+  listSubjectsByGrade, addSubjectToGrade, updateSubjectInGrade, removeSubjectFromGrade,
   // Assessment Types
   listAssessmentTypes, createAssessmentType, updateAssessmentType, deleteAssessmentType,
   // Teaching Assignments

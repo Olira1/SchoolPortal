@@ -18,6 +18,14 @@ router.put('/grades/:grade_id', schoolHeadController.updateGrade);
 router.delete('/grades/:grade_id', schoolHeadController.deleteGrade);
 
 // ==========================================
+// SUBJECTS (nested under grades - API contract)
+// ==========================================
+router.get('/grades/:grade_id/subjects', schoolHeadController.listSubjectsByGrade);
+router.post('/grades/:grade_id/subjects', schoolHeadController.addSubjectToGrade);
+router.put('/grades/:grade_id/subjects/:subject_id', schoolHeadController.updateSubjectInGrade);
+router.delete('/grades/:grade_id/subjects/:subject_id', schoolHeadController.removeSubjectFromGrade);
+
+// ==========================================
 // CLASSES (nested under grades - API contract)
 // ==========================================
 router.get('/grades/:grade_id/classes', schoolHeadController.listClassesByGrade);
