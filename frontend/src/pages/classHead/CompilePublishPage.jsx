@@ -13,6 +13,8 @@ import {
   Loader2,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Play,
   Trophy,
   BookOpen,
@@ -24,6 +26,7 @@ import {
   getStudentRankings,
   publishSemesterResults,
   publishYearResults,
+  getStudentReport,
 } from '../../services/classHeadService';
 
 const CompilePublishPage = () => {
@@ -34,9 +37,12 @@ const CompilePublishPage = () => {
   // State: data
   const [rankings, setRankings] = useState(null);
   const [compileResult, setCompileResult] = useState(null);
+  const [studentReport, setStudentReport] = useState(null);
+  const [currentStudentIndex, setCurrentStudentIndex] = useState(0);
 
   // State: UI
   const [loading, setLoading] = useState(false);
+  const [loadingReport, setLoadingReport] = useState(false);
   const [compiling, setCompiling] = useState(false);
   const [publishingSemester, setPublishingSemester] = useState(false);
   const [publishingYear, setPublishingYear] = useState(false);
@@ -61,10 +67,104 @@ const CompilePublishPage = () => {
     }
   };
 
+  // Fetch individual student report for both semesters
+  const fetchStudentReport = async (studentId) => {
+    try {
+      setLoadingReport(true);
+      // Fetch reports for both semesters
+      const [sem1Response, sem2Response] = await Promise.all([
+        getStudentReport(studentId, {
+          semester_id: 5,
+          academic_year_id: parseInt(selectedAcademicYearId),
+          type: 'semester',
+        }).catch(() => null),
+        getStudentReport(studentId, {
+          semester_id: 6,
+          academic_year_id: parseInt(selectedAcademicYearId),
+          type: 'semester',
+        }).catch(() => null),
+      ]);
+
+      const sem1Data = sem1Response?.success ? sem1Response.data : null;
+      const sem2Data = sem2Response?.success ? sem2Response.data : null;
+
+      // Merge subjects from both semesters
+      const allSubjectNames = new Set();
+      if (sem1Data?.subjects) sem1Data.subjects.forEach((s) => allSubjectNames.add(s.name));
+      if (sem2Data?.subjects) sem2Data.subjects.forEach((s) => allSubjectNames.add(s.name));
+
+      const mergedSubjects = Array.from(allSubjectNames).map((name) => {
+        const sem1Subject = sem1Data?.subjects?.find((s) => s.name === name);
+        const sem2Subject = sem2Data?.subjects?.find((s) => s.name === name);
+        const sem1Score = sem1Subject?.subject_average || 0;
+        const sem2Score = sem2Subject?.subject_average || 0;
+        const count = (sem1Score > 0 ? 1 : 0) + (sem2Score > 0 ? 1 : 0);
+        const avg = count > 0 ? (sem1Score + sem2Score) / count : 0;
+        return {
+          name,
+          sem1: sem1Score,
+          sem2: sem2Score,
+          average: Math.round(avg * 100) / 100,
+        };
+      });
+
+      const sem1Total = sem1Data?.summary?.total || 0;
+      const sem2Total = sem2Data?.summary?.total || 0;
+      const sem1Avg = sem1Data?.summary?.average || 0;
+      const sem2Avg = sem2Data?.summary?.average || 0;
+      const totalCount = (sem1Total > 0 ? 1 : 0) + (sem2Total > 0 ? 1 : 0);
+      const avgTotal = totalCount > 0 ? (sem1Total + sem2Total) / totalCount : 0;
+      const avgAvg = totalCount > 0 ? (sem1Avg + sem2Avg) / totalCount : 0;
+
+      setStudentReport({
+        student: sem1Data?.student || sem2Data?.student,
+        subjects: mergedSubjects,
+        summary: {
+          sem1Total: Math.round(sem1Total * 100) / 100,
+          sem2Total: Math.round(sem2Total * 100) / 100,
+          avgTotal: Math.round(avgTotal * 100) / 100,
+          sem1Avg: Math.round(sem1Avg * 100) / 100,
+          sem2Avg: Math.round(sem2Avg * 100) / 100,
+          avgAvg: Math.round(avgAvg * 100) / 100,
+          sem1Rank: sem1Data?.summary?.rank_in_class,
+          sem2Rank: sem2Data?.summary?.rank_in_class,
+          avgRank: null,
+          conduct: 'A',
+          sem1Absent: 0,
+          sem2Absent: sem2Data ? 1 : 0,
+        },
+      });
+    } catch (err) {
+      console.error('Error fetching student report:', err);
+      setStudentReport(null);
+    } finally {
+      setLoadingReport(false);
+    }
+  };
+
   // Load rankings on mount and selection change
   useEffect(() => {
     fetchRankings();
+    setCurrentStudentIndex(0);
+    setStudentReport(null);
   }, [selectedSemesterId]);
+
+  // Fetch student report when rankings load or student index changes
+  useEffect(() => {
+    if (rankings?.items?.length > 0 && currentStudentIndex < rankings.items.length) {
+      const student = rankings.items[currentStudentIndex];
+      fetchStudentReport(student.student_id);
+    }
+  }, [rankings, currentStudentIndex]);
+
+  // Pagination handlers
+  const handlePrevStudent = () => {
+    if (currentStudentIndex > 0) setCurrentStudentIndex(currentStudentIndex - 1);
+  };
+  const handleNextStudent = () => {
+    if (rankings?.items && currentStudentIndex < rankings.items.length - 1)
+      setCurrentStudentIndex(currentStudentIndex + 1);
+  };
 
   // Handle compile grades
   const handleCompile = async () => {
@@ -159,12 +259,12 @@ const CompilePublishPage = () => {
     }
   };
 
-  // Get rank medal/badge
-  const getRankBadge = (rank) => {
-    if (rank === 1) return <span className="text-yellow-500">🥇</span>;
-    if (rank === 2) return <span className="text-gray-400">🥈</span>;
-    if (rank === 3) return <span className="text-orange-400">🥉</span>;
-    return <span className="text-gray-500">{rank}</span>;
+  // Get rank display string
+  const getRankDisplay = (rank) => {
+    if (!rank) return '—';
+    const suffixes = { 1: 'st', 2: 'nd', 3: 'rd' };
+    const suffix = suffixes[rank] || 'th';
+    return `${rank}${suffix}`;
   };
 
   return (
@@ -311,7 +411,7 @@ const CompilePublishPage = () => {
         </div>
       </div>
 
-      {/* Rankings Table */}
+      {/* Student Report Card */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-6 h-6 animate-spin text-indigo-600 mr-2" />
@@ -319,14 +419,15 @@ const CompilePublishPage = () => {
         </div>
       ) : rankings?.items?.length > 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          {/* Header */}
           <div className="p-4 border-b border-gray-100 flex items-center justify-between">
             <div>
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                 <Trophy className="w-5 h-5 text-yellow-500" />
-                Student Rankings
+                Student Report Card
               </h2>
               <p className="text-sm text-gray-500">
-                {rankings.class?.name} — {rankings.semester || 'Semester'} — Class Average: {rankings.class_average}
+                {rankings.class?.name} — {rankings.items[currentStudentIndex]?.student_name} — Student {currentStudentIndex + 1} of {rankings.items.length}
               </p>
             </div>
             <button
@@ -338,45 +439,113 @@ const CompilePublishPage = () => {
             </button>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider w-16">Rank</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Student Name</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Subjects</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Total</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Average</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Remark</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {rankings.items.map((student) => (
-                  <tr
-                    key={student.student_id}
-                    className={`hover:bg-gray-50 ${student.rank <= 3 ? 'bg-yellow-50/50' : ''}`}
+          {/* Report Card Table */}
+          {loadingReport ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-indigo-600 mr-2" />
+              <span className="text-gray-500">Loading report...</span>
+            </div>
+          ) : studentReport ? (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-gray-700 text-white">
+                      <th className="px-6 py-3 text-left text-sm font-semibold" style={{ width: '45%' }}>Gosa Barnootaa</th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold" style={{ width: '18%' }}>Sem. 1ffaa</th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold" style={{ width: '18%' }}>Sem. 2ffaa</th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold" style={{ width: '19%' }}>Avreejii</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {studentReport.subjects.map((subject, idx) => (
+                      <tr
+                        key={subject.name}
+                        className={idx % 2 === 0 ? 'bg-red-50' : 'bg-white'}
+                      >
+                        <td className="px-6 py-2.5 text-sm text-gray-800">{subject.name}</td>
+                        <td className="px-4 py-2.5 text-center text-sm text-gray-800 font-medium">{subject.sem1 || ''}</td>
+                        <td className="px-4 py-2.5 text-center text-sm text-gray-800 font-medium">{subject.sem2 || ''}</td>
+                        <td className="px-4 py-2.5 text-center text-sm text-gray-800 font-medium">{subject.average || ''}</td>
+                      </tr>
+                    ))}
+                    {/* Summary Rows */}
+                    <tr className="bg-red-100 font-semibold">
+                      <td className="px-6 py-2.5 text-sm text-gray-900">Total</td>
+                      <td className="px-4 py-2.5 text-center text-sm text-gray-900">{studentReport.summary.sem1Total}</td>
+                      <td className="px-4 py-2.5 text-center text-sm text-gray-900">{studentReport.summary.sem2Total}</td>
+                      <td className="px-4 py-2.5 text-center text-sm text-gray-900">{studentReport.summary.avgTotal}</td>
+                    </tr>
+                    <tr className="bg-white font-semibold">
+                      <td className="px-6 py-2.5 text-sm text-gray-900">Average</td>
+                      <td className="px-4 py-2.5 text-center text-sm text-gray-900">{studentReport.summary.sem1Avg}</td>
+                      <td className="px-4 py-2.5 text-center text-sm text-gray-900">{studentReport.summary.sem2Avg}</td>
+                      <td className="px-4 py-2.5 text-center text-sm text-gray-900">{studentReport.summary.avgAvg}</td>
+                    </tr>
+                    <tr className="bg-red-50">
+                      <td className="px-6 py-2.5 text-sm text-gray-800">Conduct</td>
+                      <td className="px-4 py-2.5 text-center text-sm text-gray-800">{studentReport.summary.conduct}</td>
+                      <td className="px-4 py-2.5 text-center text-sm text-gray-800">{studentReport.summary.conduct}</td>
+                      <td className="px-4 py-2.5 text-center text-sm text-gray-800">{studentReport.summary.conduct}</td>
+                    </tr>
+                    <tr className="bg-white">
+                      <td className="px-6 py-2.5 text-sm text-gray-800">Absent</td>
+                      <td className="px-4 py-2.5 text-center text-sm text-gray-800">{studentReport.summary.sem1Absent}</td>
+                      <td className="px-4 py-2.5 text-center text-sm text-gray-800">{studentReport.summary.sem2Absent}</td>
+                      <td className="px-4 py-2.5 text-center text-sm text-gray-800"></td>
+                    </tr>
+                    <tr className="bg-red-50 font-semibold">
+                      <td className="px-6 py-2.5 text-sm text-gray-900">Rank</td>
+                      <td className="px-4 py-2.5 text-center text-sm text-gray-900">{getRankDisplay(studentReport.summary.sem1Rank)}</td>
+                      <td className="px-4 py-2.5 text-center text-sm text-gray-900">{getRankDisplay(studentReport.summary.sem2Rank)}</td>
+                      <td className="px-4 py-2.5 text-center text-sm text-gray-900">{getRankDisplay(studentReport.summary.avgRank)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              <div className="flex items-center justify-center gap-3 py-4 border-t border-gray-100">
+                <button
+                  onClick={handlePrevStudent}
+                  disabled={currentStudentIndex === 0}
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Previous
+                </button>
+                {rankings.items.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setCurrentStudentIndex(idx)}
+                    className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+                      idx === currentStudentIndex
+                        ? 'bg-indigo-600 text-white'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
                   >
-                    <td className="px-4 py-3 text-center text-sm font-bold">
-                      {getRankBadge(student.rank)}
-                    </td>
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{student.student_name}</td>
-                    <td className="px-4 py-3 text-center text-sm text-gray-600">{student.subjects_count}</td>
-                    <td className="px-4 py-3 text-center text-sm font-medium text-gray-900">{student.total}</td>
-                    <td className="px-4 py-3 text-center text-sm font-medium text-gray-900">{student.average}</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
-                        student.remark === 'Promoted'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-red-100 text-red-700'
-                      }`}>
-                        {student.remark}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    {idx + 1}
+                  </button>
+                )).slice(
+                  Math.max(0, currentStudentIndex - 2),
+                  Math.min(rankings.items.length, currentStudentIndex + 3)
+                )}
+                {currentStudentIndex + 3 < rankings.items.length && (
+                  <span className="text-gray-400 text-sm">...</span>
+                )}
+                <button
+                  onClick={handleNextStudent}
+                  disabled={currentStudentIndex === rankings.items.length - 1}
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Next
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-8 text-gray-500 text-sm">No report data available for this student.</div>
+          )}
         </div>
       ) : (
         <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
