@@ -39,6 +39,7 @@ const CompilePublishPage = () => {
   const [compileResult, setCompileResult] = useState(null);
   const [studentReport, setStudentReport] = useState(null);
   const [currentStudentIndex, setCurrentStudentIndex] = useState(0);
+  const [averageRankings, setAverageRankings] = useState({});
 
   // State: UI
   const [loading, setLoading] = useState(false);
@@ -128,7 +129,7 @@ const CompilePublishPage = () => {
           avgAvg: Math.round(avgAvg * 100) / 100,
           sem1Rank: sem1Data?.summary?.rank_in_class,
           sem2Rank: sem2Data?.summary?.rank_in_class,
-          avgRank: null,
+          avgRank: averageRankings[studentId] || null,
           conduct: 'A',
           sem1Absent: 0,
           sem2Absent: sem2Data ? 1 : 0,
@@ -142,9 +143,47 @@ const CompilePublishPage = () => {
     }
   };
 
+  // Compute average rankings across both semesters
+  const computeAverageRankings = async () => {
+    try {
+      const [rank1Res, rank2Res] = await Promise.all([
+        getStudentRankings({ semester_id: 5 }).catch(() => null),
+        getStudentRankings({ semester_id: 6 }).catch(() => null),
+      ]);
+      const rank1Items = rank1Res?.success ? rank1Res.data.items : [];
+      const rank2Items = rank2Res?.success ? rank2Res.data.items : [];
+
+      // Merge all student IDs
+      const studentMap = new Map();
+      rank1Items.forEach((s) => {
+        studentMap.set(s.student_id, { sem1Total: s.total });
+      });
+      rank2Items.forEach((s) => {
+        const existing = studentMap.get(s.student_id) || {};
+        studentMap.set(s.student_id, { ...existing, sem2Total: s.total });
+      });
+
+      // Compute average total and sort
+      const avgList = Array.from(studentMap.entries()).map(([id, data]) => {
+        const s1 = data.sem1Total || 0;
+        const s2 = data.sem2Total || 0;
+        const count = (s1 > 0 ? 1 : 0) + (s2 > 0 ? 1 : 0);
+        return { student_id: id, avgTotal: count > 0 ? (s1 + s2) / count : 0 };
+      });
+      avgList.sort((a, b) => b.avgTotal - a.avgTotal);
+
+      const rankMap = {};
+      avgList.forEach((s, idx) => { rankMap[s.student_id] = idx + 1; });
+      setAverageRankings(rankMap);
+    } catch (err) {
+      console.error('Error computing average rankings:', err);
+    }
+  };
+
   // Load rankings on mount and selection change
   useEffect(() => {
     fetchRankings();
+    computeAverageRankings();
     setCurrentStudentIndex(0);
     setStudentReport(null);
   }, [selectedSemesterId]);
@@ -155,7 +194,7 @@ const CompilePublishPage = () => {
       const student = rankings.items[currentStudentIndex];
       fetchStudentReport(student.student_id);
     }
-  }, [rankings, currentStudentIndex]);
+  }, [rankings, currentStudentIndex, averageRankings]);
 
   // Pagination handlers
   const handlePrevStudent = () => {
