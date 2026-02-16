@@ -161,6 +161,20 @@ const RostersPage = () => {
       return aRank - bRank;
     });
 
+    // Compute average ranks: sort all students by their average total descending
+    const avgRankMap = {};
+    const studentsForAvgRank = mergedStudents.map(student => {
+      const s1 = student.sem1;
+      const s2 = student.sem2;
+      const t1 = parseFloat(s1?.total) || 0;
+      const t2 = parseFloat(s2?.total) || 0;
+      const count = (t1 > 0 ? 1 : 0) + (t2 > 0 ? 1 : 0);
+      const avgTot = count > 0 ? (t1 + t2) / count : 0;
+      return { key: student.student_id || student.name, avgTotal: avgTot };
+    });
+    studentsForAvgRank.sort((a, b) => b.avgTotal - a.avgTotal);
+    studentsForAvgRank.forEach((s, idx) => { avgRankMap[s.key] = idx + 1; });
+
     // Extract all unique subject names (in order)
     const subjectNamesSet = new Set();
     sem1Students.forEach(s => {
@@ -383,7 +397,9 @@ const RostersPage = () => {
                         <td className="border border-gray-300 px-2 py-1.5 text-center text-gray-900">
                           {avgAverage != null ? Math.round(avgAverage * 10) / 10 : ''}
                         </td>
-                        <td className="border border-gray-300 px-2 py-1.5 text-center text-gray-700"></td>
+                        <td className="border border-gray-300 px-2 py-1.5 text-center text-gray-900">
+                          {avgRankMap[student.student_id || student.name] || ''}
+                        </td>
                         <td className="border border-gray-300 px-2 py-1.5 text-center text-gray-700"></td>
                       </tr>
                     </React.Fragment>

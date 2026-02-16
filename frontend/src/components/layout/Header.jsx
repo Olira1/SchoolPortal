@@ -57,7 +57,7 @@ const Header = ({ onMenuClick }) => {
         {/* Mobile Menu Button */}
         <button
           onClick={onMenuClick}
-          className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
+          className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
         >
           <Menu className="w-6 h-6 text-gray-600" />
         </button>
