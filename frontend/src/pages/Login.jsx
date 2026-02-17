@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { GraduationCap, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
+import DemoCredentials from './DemoCredentials';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -190,6 +191,9 @@ const Login = () => {
             )}
           </button>
         </form>
+
+        {/* email and password */}
+        <DemoCredentials />
 
         {/* Footer */}
         <p className="text-center text-xs text-gray-400 mt-8">

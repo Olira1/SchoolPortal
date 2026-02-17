@@ -209,17 +209,18 @@ const getStudentRankings = async (req, res) => {
     // Calculate totals for each student
     const studentResults = [];
     for (const student of students) {
-      // Get all subject scores for this student
+      // Get all subject scores for this student (only submitted/approved subjects)
       const [scores] = await pool.query(
         `SELECT ta.subject_id, 
                 SUM(m.score / m.max_score * COALESCE(aw.weight_percent, at.default_weight_percent)) as weighted_score
          FROM marks m
          JOIN teaching_assignments ta ON m.teaching_assignment_id = ta.id
          JOIN assessment_types at ON m.assessment_type_id = at.id
+         JOIN grade_submissions gs ON gs.teaching_assignment_id = ta.id AND gs.semester_id = m.semester_id
          LEFT JOIN assessment_weights aw ON aw.teaching_assignment_id = m.teaching_assignment_id 
                                          AND aw.assessment_type_id = m.assessment_type_id 
                                          AND aw.semester_id = m.semester_id
-         WHERE m.student_id = ? AND m.semester_id = ? AND ta.class_id = ?
+         WHERE m.student_id = ? AND m.semester_id = ? AND ta.class_id = ? AND gs.status IN ('submitted', 'approved')
          GROUP BY ta.subject_id`,
         [student.student_id, semester_id, classInfo.id]
       );
@@ -551,16 +552,17 @@ const compileGrades = async (req, res) => {
     // Calculate and store results for each student
     const studentResults = [];
     for (const student of students) {
-      // Calculate total from all subjects
+      // Calculate total from all submitted/approved subjects
       const [scores] = await pool.query(
         `SELECT SUM(m.score / m.max_score * COALESCE(aw.weight_percent, at.default_weight_percent)) as subject_score
          FROM marks m
          JOIN teaching_assignments ta ON m.teaching_assignment_id = ta.id
          JOIN assessment_types at ON m.assessment_type_id = at.id
+         JOIN grade_submissions gs ON gs.teaching_assignment_id = ta.id AND gs.semester_id = m.semester_id
          LEFT JOIN assessment_weights aw ON aw.teaching_assignment_id = m.teaching_assignment_id 
                                          AND aw.assessment_type_id = m.assessment_type_id 
                                          AND aw.semester_id = m.semester_id
-         WHERE m.student_id = ? AND m.semester_id = ? AND ta.class_id = ?
+         WHERE m.student_id = ? AND m.semester_id = ? AND ta.class_id = ? AND gs.status IN ('submitted', 'approved')
          GROUP BY ta.subject_id`,
         [student.student_id, semester_id, classInfo.id]
       );
@@ -1016,14 +1018,16 @@ const getStudentReport = async (req, res) => {
     const [semesterInfo] = await pool.query('SELECT name FROM semesters WHERE id = ?', [semester_id]);
     const [yearInfo] = await pool.query('SELECT name FROM academic_years WHERE id = ?', [academic_year_id]);
 
-    // Get subjects and scores
+    // Get subjects and scores (only subjects with submitted/approved grades)
     const [assignments] = await pool.query(
-      `SELECT ta.id, s.name as subject_name, u.name as teacher_name
+      `SELECT DISTINCT ta.id, s.name as subject_name, u.name as teacher_name
        FROM teaching_assignments ta
        JOIN subjects s ON ta.subject_id = s.id
        JOIN users u ON ta.teacher_id = u.id
-       WHERE ta.class_id = ?`,
-      [classInfo.id]
+       JOIN marks m ON m.teaching_assignment_id = ta.id AND m.student_id = ? AND m.semester_id = ?
+       JOIN grade_submissions gs ON gs.teaching_assignment_id = ta.id AND gs.semester_id = ?
+       WHERE ta.class_id = ? AND gs.status IN ('submitted', 'approved')`,
+      [student_id, semester_id, semester_id, classInfo.id]
     );
 
     const subjects = [];

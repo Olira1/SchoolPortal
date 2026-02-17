@@ -298,8 +298,15 @@ const SemesterReportPage = () => {
                         : ''}
                     </td>
                     <td className="py-2.5 px-4 text-center font-bold text-gray-900">
-                      {sem1Summary?.rank_in_class
+                      {sem1Summary?.rank_in_class && sem2Summary?.rank_in_class
+                        ? (() => {
+                            const avgRank = Math.round((sem1Summary.rank_in_class + sem2Summary.rank_in_class) / 2);
+                            return `${avgRank}${getOrdinal(avgRank)}`;
+                          })()
+                        : sem1Summary?.rank_in_class
                         ? `${sem1Summary.rank_in_class}${getOrdinal(sem1Summary.rank_in_class)}`
+                        : sem2Summary?.rank_in_class
+                        ? `${sem2Summary.rank_in_class}${getOrdinal(sem2Summary.rank_in_class)}`
                         : ''}
                     </td>
                   </tr>

@@ -537,7 +537,15 @@ const CompilePublishPage = () => {
                       <td className="px-6 py-2.5 text-sm text-gray-900">Rank</td>
                       <td className="px-4 py-2.5 text-center text-sm text-gray-900">{getRankDisplay(studentReport.summary.sem1Rank)}</td>
                       <td className="px-4 py-2.5 text-center text-sm text-gray-900">{getRankDisplay(studentReport.summary.sem2Rank)}</td>
-                      <td className="px-4 py-2.5 text-center text-sm text-gray-900">{getRankDisplay(studentReport.summary.avgRank)}</td>
+                      <td className="px-4 py-2.5 text-center text-sm text-gray-900">
+                        {studentReport.summary.sem1Rank && studentReport.summary.sem2Rank
+                          ? getRankDisplay(Math.round((studentReport.summary.sem1Rank + studentReport.summary.sem2Rank) / 2))
+                          : studentReport.summary.sem1Rank
+                          ? getRankDisplay(studentReport.summary.sem1Rank)
+                          : studentReport.summary.sem2Rank
+                          ? getRankDisplay(studentReport.summary.sem2Rank)
+                          : '—'}
+                      </td>
                     </tr>
                   </tbody>
                 </table>

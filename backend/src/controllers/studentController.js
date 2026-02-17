@@ -59,7 +59,7 @@ const getSemesterReport = async (req, res) => {
 
     const result = results[0];
 
-    // Get subject scores (include subject id for detail navigation)
+    // Get subject scores (include subject id for detail navigation, only submitted/approved subjects)
     const [subjects] = await pool.query(
       `SELECT s.id as subject_id, s.name,
               SUM(m.score / m.max_score * COALESCE(aw.weight_percent, at.default_weight_percent)) as score
@@ -67,10 +67,11 @@ const getSemesterReport = async (req, res) => {
        JOIN teaching_assignments ta ON m.teaching_assignment_id = ta.id
        JOIN subjects s ON ta.subject_id = s.id
        JOIN assessment_types at ON m.assessment_type_id = at.id
+       JOIN grade_submissions gs ON gs.teaching_assignment_id = ta.id AND gs.semester_id = m.semester_id
        LEFT JOIN assessment_weights aw ON aw.teaching_assignment_id = m.teaching_assignment_id 
                                        AND aw.assessment_type_id = m.assessment_type_id 
                                        AND aw.semester_id = m.semester_id
-       WHERE m.student_id = ? AND m.semester_id = ? AND ta.class_id = ?
+       WHERE m.student_id = ? AND m.semester_id = ? AND ta.class_id = ? AND gs.status IN ('submitted', 'approved')
        GROUP BY s.id, s.name
        ORDER BY s.name`,
       [student.id, semester_id, student.class_id]
