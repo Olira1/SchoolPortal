@@ -1,3 +1,11 @@
+# other folder
+../Design/
+../Plan/
+../API%20CONTRACT/
+../README.md
+../.cursor/
+../.kiro/
+../.vscode/
 # Dependencies
 node_modules/
 
