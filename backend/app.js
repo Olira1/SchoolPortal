@@ -4,8 +4,7 @@ const cors = require('cors');
 
 const app = express();
 
-// Middleware
-// CORS configuration - allow all origins for now
+// Middleware - Simple CORS that allows all origins
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -14,9 +13,6 @@ app.use(express.urlencoded({ extended: true }));
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
 });
-
-// Handle preflight requests for all routes
-app.options('/*', cors());
 
 // API Routes
 app.use('/api/v1/auth', require('./src/routes/auth'));
@@ -28,7 +24,7 @@ app.use('/api/v1/student', require('./src/routes/student'));
 app.use('/api/v1/parent', require('./src/routes/parent'));
 app.use('/api/v1/store-house', require('./src/routes/storeHouse'));
 
-// Error handling middleware (will be implemented later)
+// Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({
