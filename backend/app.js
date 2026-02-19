@@ -37,6 +37,9 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
 });
 
+// Handle preflight requests for all routes
+app.options('*', cors());
+
 // API Routes
 app.use('/api/v1/auth', require('./src/routes/auth'));
 app.use('/api/v1/admin', require('./src/routes/admin'));
