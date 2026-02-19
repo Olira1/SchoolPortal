@@ -5,30 +5,8 @@ const cors = require('cors');
 const app = express();
 
 // Middleware
-// CORS configuration - allow requests from frontend
-app.use(cors({
-  origin: function(origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    const allowedOrigins = [
-      'http://localhost:5173',
-      'http://localhost:3000',
-      'https://schoolport-hk7u.vercel.app',
-      process.env.FRONTEND_URL
-    ].filter(Boolean);
-    
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      // For debugging: allow all origins temporarily
-      callback(null, true);
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+// CORS configuration - allow all origins for now
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -38,7 +16,7 @@ app.get('/health', (req, res) => {
 });
 
 // Handle preflight requests for all routes
-app.options('*', cors());
+app.options('/*', cors());
 
 // API Routes
 app.use('/api/v1/auth', require('./src/routes/auth'));
