@@ -4,5 +4,28 @@
 API CONTRACT/
 Design/
 Plan/
-README.md
+tidbinfo.md
+# Environment files
+.env
+.env.local
+.env.production
+.env.*.local
+*.env
+
+# Documentation (keep local only)
 TiDB.md
+
+# Node modules
+node_modules/
+*/node_modules/
+
+# Build outputs
+dist/
+build/
+*/dist/
+*/build/
+
+# Logs
+*.log
+npm-debug.log*
+logs/
