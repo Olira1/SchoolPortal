@@ -10,15 +10,14 @@ const corsOptions = {
     // Allow requests with no origin (like mobile apps, curl, Postman)
     if (!origin) return callback(null, true);
     
-    // List of allowed origins
+    // List of allowed origins - includes environment variable for production
     const allowedOrigins = [
       'http://localhost:5173',
       'http://localhost:5174',
       'http://localhost:3000',
-      'https://schoolport-hk7u.vercel.app',
-      'https://schoolportal-frontend-beta.vercel.app',
+      process.env.FRONTEND_URL,  // Dynamic frontend URL from environment
       /\.vercel\.app$/  // Allow all Vercel preview deployments
-    ];
+    ].filter(Boolean);  // Remove undefined values
     
     // Check if origin is allowed
     const isAllowed = allowedOrigins.some(allowed => {
